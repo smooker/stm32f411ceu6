@@ -1,1 +1,1 @@
-# stm32f411ceu6
+# STM32F411CEU6 HAL bootstrap project w/ qt-creator files generator.
