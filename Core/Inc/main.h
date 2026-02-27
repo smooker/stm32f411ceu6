@@ -56,11 +56,6 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
-void dot();
-void dash();
-uint8_t morse(const char *format, ... );
-uint8_t cdcprintf(const char *format, ... );
-
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

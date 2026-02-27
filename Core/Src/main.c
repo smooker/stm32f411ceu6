@@ -35,6 +35,11 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+void dot();
+void dash();
+uint8_t morse(const char *format, ... );
+uint8_t cdcprintf(const char *format, ... );
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,7 +52,6 @@
 /* USER CODE BEGIN PV */
 
 uint8_t buffx[129]  = {0x00};                         //TX buffer
-uint8_t buffx2[129] = {0x00};                        //TX buffer for morse
 
 // __attribute__((section(".rodata"))) const char* morseCode[] = {
 const char* morseCode[] = {
@@ -99,6 +103,22 @@ void volatile_memset(volatile void *s, int c, size_t n) {
     }
 }
 
+void dot()
+{
+    HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_RESET);
+    HAL_Delay(80);
+    HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
+    HAL_Delay(80);
+}
+
+void dash()
+{
+    HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_RESET);
+    HAL_Delay(200);
+    HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
+    HAL_Delay(80);
+}
+
 //
 uint8_t cdcprintf(const char *format, ... )
 {
@@ -128,61 +148,50 @@ uint8_t cdcprintf(const char *format, ... )
 
 uint8_t morse(const char *format, ... )
 {
-    // BKPT;
     va_list ap;
 
     uint8_t result;
-    uint8_t len;
 
     unsigned char lettInMorse[8];
 
     uint8_t pseudoASCII;
 
-    volatile_memset(buffx2, 0, sizeof(buffx2));
-
-    va_start(ap, format);
-    result = vsprintf(buffx2, format, ap);
-    va_end(ap);
-
-    len = strlen((const char*)buffx2);
-
-    // here
+    // use only format
 
     uint8_t cnt2 = 0;
 
-    while (buffx[cnt2] > 0)
+    while (format[cnt2] > 0)
     {
         //
-        if ( buffx2[cnt2] == 0x00 ) {
+        if ( format[cnt2] == 0x00 ) {
             break;
         }
         //
-        if ( ( buffx2[cnt2] > 90 ) | ( buffx2[cnt2] < 65 ) ) {
+        if ( ( format[cnt2] > 90 ) | ( format[cnt2] < 65 ) ) {
             BKPT;
             break;
         }
 
-        pseudoASCII = buffx2[cnt2]-65;
+        pseudoASCII = format[cnt2]-65;
 
-        uint8_t cnt = 0;
+        uint8_t index = 0;        //indexLett in letter
 
         while (1) {
             if (pseudoASCII > 25) {
-                cdcprintf("%02x:%02x\r\n", pseudoASCII, buffx2[cnt2]);
-                BKPT;
-            }
-            lettInMorse[cnt] = morseCode[pseudoASCII][cnt];
-            if (lettInMorse[cnt] == 0) {
-                //BKPT;
+                // cdcprintf("%02x:%02x\r\n", pseudoASCII, format[cnt2]); //fixme
                 break;
             }
-            if (lettInMorse[cnt] == '.') {
+            lettInMorse[index] = morseCode[pseudoASCII][index];
+            if (lettInMorse[index] == 0) {        // end of string
+                break;
+            }
+            if (lettInMorse[index] == '.') {      //dot
                 dot();
             }
-            if (lettInMorse[cnt] == '-') {
+            if (lettInMorse[index] == '-') {      //dash
                 dash();
             }
-            cnt++;
+            index++;
         }
         HAL_Delay(160);
         cnt2++;
@@ -228,10 +237,22 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+
+  HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
+
+  cdcprintf("STEPPER %d", 2024);
+
   while (1)
   {
-    /* USER CODE END WHILE */
 
+    // HAL_Delay(100);
+    // HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_RESET);
+    // HAL_Delay(100);
+    /* USER CODE END WHILE */
+    morse("VGZ");
+    HAL_Delay(500);
+    // BKPT;
+    // HAL_Delay(1000);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
