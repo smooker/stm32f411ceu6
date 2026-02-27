@@ -4,22 +4,12 @@ find . -name "*.c" > stepper.files
 find . -name "*.h" >> stepper.files
 echo "Makefile" >> stepper.files
 echo "./Core/Inc/" > stepper.includes
-echo "./Drivers/STM32F0xx_HAL_Driver/Inc/" >> stepper.includes
-echo "./Drivers/CMSIS/Device/ST/STM32F0xx/Include/" >> stepper.includes
-echo "./Drivers/STM32F1xx_HAL_Driver/Inc/" >> stepper.includes
-echo "./Drivers/STM32F1xx_HAL_Driver/Inc/Legacy/" >> stepper.includes
-echo "./Core/Inc" >> stepper.includes 
-echo "./Drivers/STM32F1xx_HAL_Driver/Inc/Legacy" >> stepper.includes
-echo "./Drivers/STM32F1xx_HAL_Driver/Inc" >> stepper.includes
-echo "./Drivers/CMSIS/Device/ST/STM32F1xx/Include" >> stepper.includes
 echo "./Drivers/CMSIS/Include" >> stepper.includes
 echo "./USB_DEVICE/App" >> stepper.includes
 echo "./USB_DEVICE/Target" >> stepper.includes
 echo "./Middlewares/ST/STM32_USB_Device_Library/Core/Inc" >> stepper.includes
 echo "./Middlewares/ST/STM32_USB_Device_Library/Class/CDC/Inc" >> stepper.includes
-echo "./src" >> stepper.includes
 
-
-find . -name stm32f4xx_hal.h
-find . -name stm32f4xx.h
+#find . -name stm32f4xx_hal.h
+#find . -name stm32f4xx.h
 

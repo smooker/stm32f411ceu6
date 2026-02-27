@@ -233,6 +233,8 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
+  HAL_Delay(1200);      //wait for USB reenumeration
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -240,7 +242,11 @@ int main(void)
 
   HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
 
-  cdcprintf("STEPPER %d", 2024);
+  cdcprintf("STEPPER %d\r\n", 2024);
+  cdcprintf("STEPPER %d\r\n", 2024);
+  cdcprintf("STEPPER %d\r\n", 2024);
+
+  HAL_Delay(300);
 
   while (1)
   {
