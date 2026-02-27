@@ -131,7 +131,7 @@ uint8_t cdcprintf(const char *format, ... )
     int vsprintfResult;
 
     va_start(ap, format);
-    vsprintfResult = vsprintf(buffx, format, ap);
+    vsprintfResult = vsprintf(&buffx[0], format, ap);
     if ( vsprintfResult < 0 ) {
         BKPT;
     }
