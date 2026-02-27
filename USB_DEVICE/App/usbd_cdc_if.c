@@ -284,7 +284,7 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
   /* USER CODE BEGIN 7 */
 
   if ( hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED ) {
-      BKPT;     //fixme smooker. handling of non-connected state. do not forget the breakpoint on production.
+      // BKPT;     //fixme smooker. handling of non-connected state. do not forget the breakpoint on production.
       return USBD_OK;
   }
 

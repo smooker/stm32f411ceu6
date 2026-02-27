@@ -21,9 +21,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
+#include "defines.h"
+#include "stdarg.h"
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
-#include "stdarg.h"
 
 /* USER CODE END Includes */
 
@@ -153,8 +155,6 @@ uint8_t morse(const char *format, ... )
     unsigned char lettInMorse[8];
 
     uint8_t pseudoASCII;
-
-    // use only format
 
     uint8_t cnt2 = 0;
 

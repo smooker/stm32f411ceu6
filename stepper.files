@@ -1233,3 +1233,4 @@
 ./Core/Inc/stm32f4xx_it.h
 ./Core/Inc/main.h
 Makefile
+./Core/Inc/defines.h
