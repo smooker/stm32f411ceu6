@@ -47,12 +47,19 @@ extern "C" {
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
 
+#define BKPT asm("bkpt 255")
+
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+
+void dot();
+void dash();
+uint8_t morse(const char *format, ... );
+uint8_t cdcprintf(const char *format, ... );
 
 /* USER CODE END EFP */
 
@@ -71,6 +78,8 @@ void Error_Handler(void);
 #define BUTT_STEPL_GPIO_Port GPIOB
 #define BUTT_STEPR_Pin GPIO_PIN_1
 #define BUTT_STEPR_GPIO_Port GPIOB
+#define BUZZ_Pin GPIO_PIN_15
+#define BUZZ_GPIO_Port GPIOB
 #define PULSE_Pin GPIO_PIN_8
 #define PULSE_GPIO_Port GPIOA
 #define DIR_Pin GPIO_PIN_9

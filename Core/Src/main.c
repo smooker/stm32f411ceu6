@@ -18,10 +18,12 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "usb_device.h"
+#include "usbd_cdc_if.h"
+#include "stdarg.h"
 
 /* USER CODE END Includes */
 
@@ -44,6 +46,39 @@
 
 /* USER CODE BEGIN PV */
 
+uint8_t buffx[129]  = {0x00};                         //TX buffer
+uint8_t buffx2[129] = {0x00};                        //TX buffer for morse
+
+// __attribute__((section(".rodata"))) const char* morseCode[] = {
+const char* morseCode[] = {
+    ".-",               // A
+    "-...",             // B
+    "-.-.",             // C
+    "-..",              // D
+    ".",                // E
+    "..-.",             // F
+    "--.",              // G
+    "....",             // H
+    "..",               // I
+    ".---",             // J
+    "-.-",              // K
+    ".-..",             // L
+    "--",               // M
+    "-.",               // N
+    "---",              // O
+    ".--.",             // P
+    "--.-",             // Q
+    ".-.",              // R
+    "...",              // S
+    "-",                // T
+    "..-",              // U
+    "...-",             // V
+    ".--",              // W
+    "-..-",             // X
+    "-.--",             // Y
+    "--..",             // Z
+};   //morse code from A to Z
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -55,6 +90,105 @@ static void MX_GPIO_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+//
+void volatile_memset(volatile void *s, int c, size_t n) {
+    volatile unsigned char *p = (volatile unsigned char *)s;
+    while (n-- > 0) {
+        *p++ = (unsigned char)c;
+    }
+}
+
+//
+uint8_t cdcprintf(const char *format, ... )
+{
+    uint8_t result = USBD_FAIL;
+
+    va_list ap;
+
+    volatile_memset(buffx, 0, sizeof(buffx));
+
+    int vsprintfResult;
+
+    va_start(ap, format);
+    vsprintfResult = vsprintf(buffx, format, ap);
+    if ( vsprintfResult < 0 ) {
+        BKPT;
+    }
+    va_end(ap);
+    uint8_t len = strlen((const char*)buffx);
+
+    while (result != USBD_OK) {
+        result = CDC_Transmit_FS(buffx, (uint16_t)len);
+    }
+
+    return result; //
+}
+
+
+uint8_t morse(const char *format, ... )
+{
+    // BKPT;
+    va_list ap;
+
+    uint8_t result;
+    uint8_t len;
+
+    unsigned char lettInMorse[8];
+
+    uint8_t pseudoASCII;
+
+    volatile_memset(buffx2, 0, sizeof(buffx2));
+
+    va_start(ap, format);
+    result = vsprintf(buffx2, format, ap);
+    va_end(ap);
+
+    len = strlen((const char*)buffx2);
+
+    // here
+
+    uint8_t cnt2 = 0;
+
+    while (buffx[cnt2] > 0)
+    {
+        //
+        if ( buffx2[cnt2] == 0x00 ) {
+            break;
+        }
+        //
+        if ( ( buffx2[cnt2] > 90 ) | ( buffx2[cnt2] < 65 ) ) {
+            BKPT;
+            break;
+        }
+
+        pseudoASCII = buffx2[cnt2]-65;
+
+        uint8_t cnt = 0;
+
+        while (1) {
+            if (pseudoASCII > 25) {
+                cdcprintf("%02x:%02x\r\n", pseudoASCII, buffx2[cnt2]);
+                BKPT;
+            }
+            lettInMorse[cnt] = morseCode[pseudoASCII][cnt];
+            if (lettInMorse[cnt] == 0) {
+                //BKPT;
+                break;
+            }
+            if (lettInMorse[cnt] == '.') {
+                dot();
+            }
+            if (lettInMorse[cnt] == '-') {
+                dash();
+            }
+            cnt++;
+        }
+        HAL_Delay(160);
+        cnt2++;
+    }
+    return result; //
+}
 
 /* USER CODE END 0 */
 
@@ -169,6 +303,9 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, PULSE_Pin|DIR_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : LED_USER_Pin */
@@ -189,6 +326,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : BUZZ_Pin */
+  GPIO_InitStruct.Pin = BUZZ_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(BUZZ_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PULSE_Pin DIR_Pin */
   GPIO_InitStruct.Pin = PULSE_Pin|DIR_Pin;
@@ -216,6 +360,10 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+    HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
+    HAL_Delay(50);
+    HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_SET);
+    HAL_Delay(50);
   }
   /* USER CODE END Error_Handler_Debug */
 }

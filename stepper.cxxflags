@@ -1,1 +1,1 @@
--std=c++17 -DSTM32F411xE
+-std=c99 -DSTM32F411xE
