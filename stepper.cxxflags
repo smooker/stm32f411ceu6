@@ -1,1 +1,1 @@
--std=gnu99 -DSTM32F411xE
+-std=gnu23 -DSTM32F411xE

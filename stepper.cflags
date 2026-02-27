@@ -1,1 +1,1 @@
--std=gnu99 -DSTM32F411xE -I./Core/Inc/
+-std=gnu23 -DSTM32F411xE -I./Core/Inc/

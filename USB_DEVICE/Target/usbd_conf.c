@@ -220,7 +220,7 @@ void HAL_PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
 {
   /* Inform USB library that core enters in suspend Mode. */
   USBD_LL_Suspend((USBD_HandleTypeDef*)hpcd->pData);
-  __HAL_PCD_GATE_PHYCLOCK(hpcd);
+  __HAL_PCD_GATE_PHYCLOCK(hpcd);                //fixme. clang warning
   /* Enter in STOP mode. */
   /* USER CODE BEGIN 2 */
   if (hpcd->Init.low_power_enable)
@@ -614,7 +614,7 @@ USBD_StatusTypeDef USBD_LL_SetTestMode(USBD_HandleTypeDef *pdev, uint8_t testmod
   * @param  size: Size of allocated memory
   * @retval None
   */
-void *USBD_static_malloc(uint32_t size)
+void *USBD_static_malloc(uint32_t /*size*/)     //fixme
 {
   static uint32_t mem[(sizeof(USBD_CDC_HandleTypeDef)/4)+1];/* On 32-bit boundary */
   return mem;
@@ -625,7 +625,7 @@ void *USBD_static_malloc(uint32_t size)
   * @param  p: Pointer to allocated  memory address
   * @retval None
   */
-void USBD_static_free(void *p)
+void USBD_static_free(void */*p*/)      //fixme
 {
 
 }

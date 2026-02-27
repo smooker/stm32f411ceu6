@@ -131,7 +131,7 @@ uint8_t cdcprintf(const char *format, ... )
     int vsprintfResult;
 
     va_start(ap, format);
-    vsprintfResult = vsprintf(&buffx[0], format, ap);
+    vsprintfResult = vsprintf((char*)&buffx[0], format, ap);
     if ( vsprintfResult < 0 ) {
         BKPT;
     }
@@ -148,9 +148,7 @@ uint8_t cdcprintf(const char *format, ... )
 
 uint8_t morse(const char *format, ... )
 {
-    va_list ap;
-
-    uint8_t result;
+    uint8_t result = 0;
 
     unsigned char lettInMorse[8];
 
