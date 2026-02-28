@@ -1,0 +1,4 @@
+#.clangd
+CompileFlags:
+  Add: 
+  [-include /home/smooker/src/stm32/stepper/Core/Inc/defines.h]

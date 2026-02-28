@@ -166,6 +166,7 @@ uint8_t cdcprintf(const char *format, ... )
     uint8_t len = strlen((const char*)buffx);
 
     while (result != USBD_OK) {
+        // here smooker
         result = CDC_Transmit_FS(buffx, (uint16_t)len);
     }
 
@@ -242,6 +243,8 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 
+  HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -265,7 +268,7 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_Delay(1200);      //wait for USB reenumeration
+  HAL_Delay(1500);      //wait for USB reenumeration
 
   /* USER CODE END 2 */
 
@@ -359,10 +362,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, PULSE_Pin|DIR_Pin, GPIO_PIN_RESET);

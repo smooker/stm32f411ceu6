@@ -1,1 +1,1 @@
--std=gnu23 -DSTM32F411xE -I./Core/Inc/
+-std=gnu2x -include ./Core/Inc/defines.h -DSTM32F411xE -I./Core/Inc/
