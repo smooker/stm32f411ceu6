@@ -37,6 +37,11 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define dotTime       60
+#define interTime     dotTime
+#define dashTime      3*dotTime
+#define spaceTime     7*dotTime
+
 void dot();
 void dash();
 uint8_t morse(const char *format, ... );
@@ -57,6 +62,16 @@ uint8_t buffx[129]  = {0x00};                         //TX buffer
 
 // __attribute__((section(".rodata"))) const char* morseCode[] = {
 const char* morseCode[] = {
+    "-----",            // 0
+    ".----",            // 1
+    "..---",            // 2
+    "...--",            // 3
+    "....-",            // 4
+    ".....",            // 5
+    "-....",            // 6
+    "--...",            // 7
+    "---..",            // 8
+    "----.",            // 9
     ".-",               // A
     "-...",             // B
     "-.-.",             // C
@@ -107,18 +122,28 @@ void volatile_memset(volatile void *s, int c, size_t n) {
 
 void dot()
 {
+    HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_RESET);
-    HAL_Delay(80);
+
+    HAL_Delay(dotTime);
+
+    HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
-    HAL_Delay(80);
+
+    HAL_Delay(interTime);
 }
 
 void dash()
 {
+    HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_RESET);
-    HAL_Delay(200);
+
+    HAL_Delay(dashTime);
+
     HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
-    HAL_Delay(80);
+    HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_SET);
+
+    HAL_Delay(interTime);
 }
 
 //
@@ -154,32 +179,41 @@ uint8_t morse(const char *format, ... )
 
     unsigned char lettInMorse[8];
 
-    uint8_t pseudoASCII;
-
     uint8_t cnt2 = 0;
 
-    while (format[cnt2] > 0)
+    uint8_t symbol;
+
+    while ( (symbol = format[cnt2]) > 0)
     {
         //
-        if ( format[cnt2] == 0x00 ) {
+        if ( symbol == 0x00 ) {
             break;
         }
-        //
-        if ( ( format[cnt2] > 90 ) | ( format[cnt2] < 65 ) ) {
-            BKPT;
-            break;
+        // check for alhpa
+        if ( ( symbol > 90 ) | ( symbol < 65 ) ) {
+          // check for digits
+          if ( ( symbol > 57 ) | ( symbol < 48 ) ) {
+            if ( symbol != 32 ) {
+              BKPT;
+              break;
+            }
+          }
         }
 
-        pseudoASCII = format[cnt2]-65;
+        if ( ( symbol <= 57 ) & ( symbol >= 48 ) ) {
+          symbol -= 48;
+        }
+        if ( ( symbol <= 90 ) & ( symbol >= 65 ) ) {
+          symbol -= 55;
+        }
+        if (symbol == 32) {
+          HAL_Delay(spaceTime);
+        }
 
         uint8_t index = 0;        //indexLett in letter
 
         while (1) {
-            if (pseudoASCII > 25) {
-                // cdcprintf("%02x:%02x\r\n", pseudoASCII, format[cnt2]); //fixme
-                break;
-            }
-            lettInMorse[index] = morseCode[pseudoASCII][index];
+            lettInMorse[index] = morseCode[symbol][index];
             if (lettInMorse[index] == 0) {        // end of string
                 break;
             }
@@ -191,7 +225,7 @@ uint8_t morse(const char *format, ... )
             }
             index++;
         }
-        HAL_Delay(160);
+        HAL_Delay(spaceTime);
         cnt2++;
     }
     return result; //
@@ -253,7 +287,7 @@ int main(void)
     // HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_RESET);
     // HAL_Delay(100);
     /* USER CODE END WHILE */
-    morse("VGZ");
+    morse("CQ CQ CQ DE LZ1CCM");
     HAL_Delay(500);
     // BKPT;
     // HAL_Delay(1000);
