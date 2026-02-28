@@ -179,9 +179,12 @@ static int8_t CDC_DeInit_FS(void)
   * @param  length: Number of data to be sent (in bytes)
   * @retval Result of the operation: USBD_OK if all operations are OK else USBD_FAIL
   */
-static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* /*pbuf*/, uint16_t /*length*/)   // fixme
+static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 {
   /* USER CODE BEGIN 5 */
+  UNUSED(pbuf);      //smooker
+  UNUSED(length);      //smooker
+
   switch(cmd)
   {
     case CDC_SEND_ENCAPSULATED_COMMAND:
@@ -260,9 +263,11 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* /*pbuf*/, uint16_t /*length*/
   * @param  Len: Number of data received (in bytes)
   * @retval Result of the operation: USBD_OK if all operations are OK else USBD_FAIL
   */
-static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t */*Len*/)       //fixme
+static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
+  UNUSED(Len);      //smooker
+
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
   USBD_CDC_ReceivePacket(&hUsbDeviceFS);
   return (USBD_OK);
@@ -285,18 +290,17 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
   uint8_t result = USBD_OK;
   /* USER CODE BEGIN 7 */
 
-  // case connected but terminal not listening on the PC side
-  if ( hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED ) {
-      BKPT;
-      return USBD_OK;
-  }
+  // // case connected but terminal not listening on the PC side
+  // if ( hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED ) {
+  //     // BKPT;           //fixme
+  //     // return USBD_OK;
+  // }
 
   // case unconnected
   if ( hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED ) {
       // BKPT;     //fixme smooker. handling of non-connected state. do not forget the breakpoint on production.
       return USBD_OK;
   }
-
 
   USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
   if (hcdc->TxState != 0){

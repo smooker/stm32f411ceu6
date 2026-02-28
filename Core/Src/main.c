@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "usb_device.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -26,6 +27,7 @@
 #include "stdarg.h"
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
+#include "stm32f4xx_hal.h" // Example for F4
 
 /* USER CODE END Includes */
 
@@ -57,6 +59,9 @@ uint8_t cdcprintf(const char *format, ... );
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
+extern USBD_HandleTypeDef hUsbDeviceFS;
+extern uint8_t UserTxBufferFS;
 
 uint8_t buffx[129]  = {0x00};                         //TX buffer
 
@@ -149,6 +154,17 @@ void dash()
 //
 uint8_t cdcprintf(const char *format, ... )
 {
+    // // USE_HAL_PCD_REGISTER_CALLBACKS
+    // if (hpcd.USB_Address > 0) {
+    //     // Device is enumerated and has an address, so it's connected
+    // }
+
+    // // case unconnected
+    // if ( hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED ) {
+    //     // BKPT;
+    //     return USBD_OK;
+    // }
+
     uint8_t result = USBD_FAIL;
 
     va_list ap;
@@ -183,13 +199,16 @@ uint8_t morse(const char *format, ... )
     uint8_t cnt2 = 0;
 
     uint8_t symbol;
+    // uint8_t tmpsymbol;
 
     while ( (symbol = format[cnt2]) > 0)
     {
+        // tmpsymbol = symbol;
         //
         if ( symbol == 0x00 ) {
             break;
         }
+
         // check for alhpa
         if ( ( symbol > 90 ) | ( symbol < 65 ) ) {
           // check for digits
@@ -208,8 +227,12 @@ uint8_t morse(const char *format, ... )
           symbol -= 55;
         }
         if (symbol == 32) {
-          HAL_Delay(spaceTime);
+            HAL_Delay(spaceTime);
+            // cdcprintf("%c", tmpsymbol);
+            cnt2++;
+            continue;
         }
+        // cdcprintf("%c", tmpsymbol);
 
         uint8_t index = 0;        //indexLett in letter
 
@@ -229,7 +252,25 @@ uint8_t morse(const char *format, ... )
         HAL_Delay(spaceTime);
         cnt2++;
     }
+    // cdcprintf("\r\n");
     return result; //
+}
+void My_PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
+{
+    UNUSED(hpcd);
+    BKPT;
+}
+
+void My_PCD_ConnectCallback(PCD_HandleTypeDef *hpcd)
+{
+    UNUSED(hpcd);
+    BKPT;
+}
+
+void My_PCD_ResetCallback(PCD_HandleTypeDef *hpcd)
+{
+    UNUSED(hpcd);
+    BKPT;
 }
 
 /* USER CODE END 0 */
@@ -268,7 +309,7 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
-  HAL_Delay(1500);      //wait for USB reenumeration
+  HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_CONNECT_CB_ID,  My_PCD_ConnectCallback);
 
   /* USER CODE END 2 */
 
@@ -277,24 +318,17 @@ int main(void)
 
   HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
 
-  cdcprintf("STEPPER %d\r\n", 2024);
-  cdcprintf("STEPPER %d\r\n", 2024);
-  cdcprintf("STEPPER %d\r\n", 2024);
+  // cdcprintf("STEPPER %d\r\n", 2024);
 
   HAL_Delay(300);
 
   while (1)
   {
-
-    // HAL_Delay(100);
-    // HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_RESET);
-    // HAL_Delay(100);
     /* USER CODE END WHILE */
-    morse("CQ CQ CQ DE LZ1CCM");
-    HAL_Delay(500);
-    // BKPT;
-    // HAL_Delay(1000);
+
     /* USER CODE BEGIN 3 */
+    morse("CQ ");
+    HAL_Delay(300);
   }
   /* USER CODE END 3 */
 }
@@ -362,13 +396,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, PULSE_Pin|DIR_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, PULSE_Pin|DIR_Pin|BUZZ_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : LED_USER_Pin */
   GPIO_InitStruct.Pin = LED_USER_Pin;
@@ -389,19 +420,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : BUZZ_Pin */
-  GPIO_InitStruct.Pin = BUZZ_Pin;
+  /*Configure GPIO pins : PULSE_Pin DIR_Pin BUZZ_Pin */
+  GPIO_InitStruct.Pin = PULSE_Pin|DIR_Pin|BUZZ_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(BUZZ_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : PULSE_Pin DIR_Pin */
-  GPIO_InitStruct.Pin = PULSE_Pin|DIR_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */

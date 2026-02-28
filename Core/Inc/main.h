@@ -71,12 +71,12 @@ void Error_Handler(void);
 #define BUTT_STEPL_GPIO_Port GPIOB
 #define BUTT_STEPR_Pin GPIO_PIN_1
 #define BUTT_STEPR_GPIO_Port GPIOB
+#define PULSE_Pin GPIO_PIN_13
+#define PULSE_GPIO_Port GPIOB
+#define DIR_Pin GPIO_PIN_14
+#define DIR_GPIO_Port GPIOB
 #define BUZZ_Pin GPIO_PIN_15
 #define BUZZ_GPIO_Port GPIOB
-#define PULSE_Pin GPIO_PIN_8
-#define PULSE_GPIO_Port GPIOA
-#define DIR_Pin GPIO_PIN_9
-#define DIR_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
 
