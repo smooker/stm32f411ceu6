@@ -28,6 +28,8 @@
 
 /* USER CODE BEGIN Includes */
 
+#include "defines.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -565,6 +567,8 @@ USBD_StatusTypeDef USBD_LL_Transmit(USBD_HandleTypeDef *pdev, uint8_t ep_addr, u
   hal_status = HAL_PCD_EP_Transmit(pdev->pData, ep_addr, pbuf, size);
 
   usb_status =  USBD_Get_USB_Status(hal_status);
+
+  // BKPT;          //smooker
 
   return usb_status;
 }

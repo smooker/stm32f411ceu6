@@ -34,6 +34,9 @@
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 
+extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
+uint8_t CDC_IsConnected = 0;
+
 /* USER CODE END PV */
 
 /** @addtogroup STM32_USB_OTG_DEVICE_LIBRARY
@@ -182,7 +185,7 @@ static int8_t CDC_DeInit_FS(void)
 static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 {
   /* USER CODE BEGIN 5 */
-  UNUSED(pbuf);      //smooker
+  // UNUSED(pbuf);      //smooker
   UNUSED(length);      //smooker
 
   switch(cmd)
@@ -233,7 +236,17 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
     break;
 
     case CDC_SET_CONTROL_LINE_STATE:
-
+        {
+            USBD_SetupReqTypedef* req = (USBD_SetupReqTypedef *)pbuf;
+            if( (req->wValue & 0x0001) != 0) {
+                // BKPT;
+                CDC_IsConnected = 1;
+            } else {
+                CDC_IsConnected = 0;
+                // BKPT;
+            }
+        }
+        CDC_IsConnected = ((USBD_HandleTypeDef*)hpcd_USB_OTG_FS.pData)->request.wValue & 0x01;  //smooker
     break;
 
     case CDC_SEND_BREAK:
@@ -304,6 +317,10 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
 
   USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
   if (hcdc->TxState != 0){
+      // we have some data waiting for transmit... smooker do not call me too fast.
+      // find out where txstate is getting updated
+      return USBD_OK;
+      // BKPT;
     return USBD_BUSY;
   }
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, Buf, Len);

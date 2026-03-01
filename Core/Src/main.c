@@ -62,8 +62,12 @@ uint8_t cdcprintf(const char *format, ... );
 extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern uint8_t UserTxBufferFS;
+extern uint8_t CDC_IsConnected;
+
 
 uint8_t buffx[129]  = {0x00};                         //TX buffer
+uint32_t sofCnt = 0;
+uint32_t oldSofCnt = 0;
 
 // __attribute__((section(".rodata"))) const char* morseCode[] = {
 const char* morseCode[] = {
@@ -154,16 +158,14 @@ void dash()
 //
 uint8_t cdcprintf(const char *format, ... )
 {
-    // // USE_HAL_PCD_REGISTER_CALLBACKS
-    // if (hpcd.USB_Address > 0) {
-    //     // Device is enumerated and has an address, so it's connected
-    // }
+    // USE_HAL_PCD_REGISTER_CALLBACKS
+    if (hpcd_USB_OTG_FS.USB_Address == 0) {
+        return  1;      //fixme smooker
+    }
 
-    // // case unconnected
-    // if ( hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED ) {
-    //     // BKPT;
-    //     return USBD_OK;
-    // }
+    if ( !CDC_IsConnected ) {
+        return 2;
+    }
 
     uint8_t result = USBD_FAIL;
 
@@ -181,8 +183,8 @@ uint8_t cdcprintf(const char *format, ... )
     va_end(ap);
     uint8_t len = strlen((const char*)buffx);
 
-    while (result != USBD_OK) {
-        // here smooker
+    while ( (result != USBD_OK) & (CDC_IsConnected) ) {
+        // here smooker. fixme
         result = CDC_Transmit_FS(buffx, (uint16_t)len);
     }
 
@@ -199,11 +201,11 @@ uint8_t morse(const char *format, ... )
     uint8_t cnt2 = 0;
 
     uint8_t symbol;
-    // uint8_t tmpsymbol;
+    uint8_t tmpsymbol;
 
     while ( (symbol = format[cnt2]) > 0)
     {
-        // tmpsymbol = symbol;
+        tmpsymbol = symbol;
         //
         if ( symbol == 0x00 ) {
             break;
@@ -228,11 +230,11 @@ uint8_t morse(const char *format, ... )
         }
         if (symbol == 32) {
             HAL_Delay(spaceTime);
-            // cdcprintf("%c", tmpsymbol);
+            cdcprintf("%c", tmpsymbol);
             cnt2++;
             continue;
         }
-        // cdcprintf("%c", tmpsymbol);
+        cdcprintf("%c", tmpsymbol);
 
         uint8_t index = 0;        //indexLett in letter
 
@@ -252,7 +254,8 @@ uint8_t morse(const char *format, ... )
         HAL_Delay(spaceTime);
         cnt2++;
     }
-    // cdcprintf("\r\n");
+    cdcprintf("\t%d\t%d\r\n ", sofCnt, sofCnt-oldSofCnt);
+    oldSofCnt = sofCnt;
     return result; //
 }
 void My_PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
@@ -264,13 +267,80 @@ void My_PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
 void My_PCD_ConnectCallback(PCD_HandleTypeDef *hpcd)
 {
     UNUSED(hpcd);
-    BKPT;
+    // BKPT;
 }
 
-void My_PCD_ResetCallback(PCD_HandleTypeDef *hpcd)
+void My_PCD_DisconnectCallback(PCD_HandleTypeDef *hpcd)
 {
     UNUSED(hpcd);
-    BKPT;
+    // BKPT;
+}
+
+void delay() {
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+        __NOP();
+}
+
+void My_PCD_SOF(PCD_HandleTypeDef *hpcd)
+{
+    UNUSED(hpcd);
+    // HAL_GPIO_TogglePin(LED_USER_GPIO_Port, LED_USER_Pin);
+    HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
+    delay();
+    HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_SET);
+    // BKPT;
+    sofCnt++;
+}
+
+void debugStruc()
+{
+    USB_CfgTypeDef *usb = &hpcd_USB_OTG_FS.Init;
+    cdcprintf("#########################################\r\n");
+    cdcprintf("hpcd_USB_OTG_FS.Init.dev_endpoints:%d\r\n", usb->dev_endpoints);
+    cdcprintf("hpcd_USB_OTG_FS.Init.Host_channels:%d\r\n", usb->Host_channels);
+    cdcprintf("hpcd_USB_OTG_FS.Init.dma_enable:%d\r\n", usb->dma_enable);
+    cdcprintf("hpcd_USB_OTG_FS.Init.speed:%d\r\n", usb->speed);
+    cdcprintf("hpcd_USB_OTG_FS.Init.ep0_mps:%d\r\n", usb->ep0_mps);
+    cdcprintf("hpcd_USB_OTG_FS.Init.phy_itface:%d\r\n", usb->phy_itface);
+    cdcprintf("hpcd_USB_OTG_FS.Init.Sof_enable:%d\r\n", usb->Sof_enable);
+    cdcprintf("hpcd_USB_OTG_FS.Init.low_power_enable:%d\r\n", usb->low_power_enable);
+    cdcprintf("hpcd_USB_OTG_FS.Init.lpm_enable:%d\r\n", usb->lpm_enable);
+    cdcprintf("hpcd_USB_OTG_FS.Init.battery_charging_enable:%d\r\n", usb->battery_charging_enable);
+    cdcprintf("hpcd_USB_OTG_FS.Init.vbus_sensing_enable:%d\r\n", usb->vbus_sensing_enable);
+    cdcprintf("hpcd_USB_OTG_FS.Init.use_dedicated_ep1:%d\r\n", usb->use_dedicated_ep1);
+    cdcprintf("hpcd_USB_OTG_FS.Init.use_external_vbus:%d\r\n", usb->use_external_vbus);
 }
 
 /* USER CODE END 0 */
@@ -310,6 +380,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_CONNECT_CB_ID,  My_PCD_ConnectCallback);
+  HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_DISCONNECT_CB_ID,  My_PCD_DisconnectCallback);
+  HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_SOF_CB_ID,  My_PCD_SOF);
 
   /* USER CODE END 2 */
 
@@ -320,15 +392,23 @@ int main(void)
 
   // cdcprintf("STEPPER %d\r\n", 2024);
 
-  HAL_Delay(300);
+  // HAL_Delay(300);
+
+  debugStruc();
 
   while (1)
   {
+      // BKPT;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    morse("CQ ");
-    HAL_Delay(300);
+    // morse("CQ ");
+    // oldSofCnt = sofCnt;
+    HAL_Delay(1000);
+    // uint32_t periodsDiff = sofCnt-oldSofCnt;
+    // cdcprintf("\t%d\t%d\r\n ", sofCnt, periodsDiff);
+    debugStruc();
+    HAL_Delay(1000);
   }
   /* USER CODE END 3 */
 }
