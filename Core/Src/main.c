@@ -59,18 +59,17 @@ uint8_t cdcprintf(const char *format, ... );
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+
+//Externs
 extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
-extern uint8_t CDC_IsConnected;     //smooker fixme later
+extern uint8_t CDC_IsConnected;
 
+// Locals
+uint8_t TCFlag = 0;        //Transfer Complete Flag for usb cdcprintf
 
-uint8_t USBconnected = 0;
-uint8_t TCF = 0;        //Transfer Complete Flag for usb cdcprintf
-
-uint32_t sofCnt = 0;
-uint32_t oldSofCnt = 0;
-
+// morse code letters and digits
 // __attribute__((section(".rodata"))) const char* morseCode[] = {
 const char* morseCode[] = {
     "-----",            // 0
@@ -123,7 +122,7 @@ static void MX_GPIO_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-//
+// my memset
 void volatile_memset(volatile void *s, int c, size_t n) {
     volatile unsigned char *p = (volatile unsigned char *)s;
     while (n-- > 0) {
@@ -131,6 +130,7 @@ void volatile_memset(volatile void *s, int c, size_t n) {
     }
 }
 
+// morse dot function
 void dot()
 {
     HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
@@ -144,6 +144,7 @@ void dot()
     HAL_Delay(interTime);
 }
 
+// morse dash function
 void dash()
 {
     HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
@@ -157,7 +158,7 @@ void dash()
     HAL_Delay(interTime);
 }
 
-//
+// console stdout
 uint8_t cdcprintf(const char *format, ... )
 {
     if (!CDC_IsConnected) {
@@ -181,9 +182,6 @@ uint8_t cdcprintf(const char *format, ... )
     va_end(ap);
     uint8_t len = strlen((const char*)&UserTxBufferFS);
 
-    // TCF = 0;
-
-    // while ( (result != USBD_OK) & (TCF == 0) ) {
     while ( (result != USBD_OK) ) {
         result = CDC_Transmit_FS(&UserTxBufferFS[0], (uint16_t)len);
     }
@@ -191,7 +189,7 @@ uint8_t cdcprintf(const char *format, ... )
     return result; //
 }
 
-
+// Morse code transmitter
 uint8_t morse(const char *format, ... )
 {
     uint8_t result = 0;
@@ -201,12 +199,11 @@ uint8_t morse(const char *format, ... )
     uint8_t cnt2 = 0;
 
     uint8_t symbol;
-    uint8_t tmpsymbol;
+    // uint8_t tmpsymbol;           //needed for CW printout in console
 
     while ( (symbol = format[cnt2]) > 0)
     {
-        tmpsymbol = symbol;
-        //
+        // end of string
         if ( symbol == 0x00 ) {
             break;
         }
@@ -222,19 +219,21 @@ uint8_t morse(const char *format, ... )
           }
         }
 
+        // convert to pseudoascii
         if ( ( symbol <= 57 ) & ( symbol >= 48 ) ) {
           symbol -= 48;
         }
+
+        // convert to pseudoascii
         if ( ( symbol <= 90 ) & ( symbol >= 65 ) ) {
           symbol -= 55;
         }
+        // space handling
         if (symbol == 32) {
             HAL_Delay(spaceTime);
-            cdcprintf("%c", tmpsymbol);
             cnt2++;
             continue;
         }
-        cdcprintf("%c", tmpsymbol);
 
         uint8_t index = 0;        //indexLett in letter
 
@@ -254,29 +253,30 @@ uint8_t morse(const char *format, ... )
         HAL_Delay(spaceTime);
         cnt2++;
     }
-    cdcprintf("\t%d\t%d\r\n", sofCnt, sofCnt-oldSofCnt);
-    oldSofCnt = sofCnt;
-    return result; //
+    return result;
 }
+
+//
 void My_PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
 {
     UNUSED(hpcd);
     BKPT;
 }
 
+// USB Physical connection
 void My_PCD_ConnectCallback(PCD_HandleTypeDef *hpcd)
 {
     UNUSED(hpcd);
-    USBconnected = 1;
 }
 
+// USB Physical disconnection
 void My_PCD_DisconnectCallback(PCD_HandleTypeDef *hpcd)
 {
     UNUSED(hpcd);
-    USBconnected = 0;
     CDC_IsConnected = 0;
 }
 
+// Many nops
 void delay() {
         __NOP();
         __NOP();
@@ -314,13 +314,14 @@ void delay() {
         __NOP();
 }
 
+// Start Of Frame Handling.
 void My_PCD_SOF(PCD_HandleTypeDef *hpcd)
 {
     UNUSED(hpcd);
-    HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
-    delay();
-    HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_SET);
-    sofCnt++;
+    //fixme. find out why there are two sof needles
+    // HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
+    // delay();
+    // HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_SET);
 }
 
 // DataOut is from HOST to DEVICE
@@ -347,12 +348,12 @@ void MyPCD_DataInStageCallback(PCD_HandleTypeDef *hpcd, uint8_t epnum)
     UNUSED(hpcd);
 
     if (epnum == 0x01) {
-        // BKPT;
-        TCF = 1;
+        TCFlag = 1;
     }
     USBD_LL_DataInStage((USBD_HandleTypeDef*)hpcd->pData, epnum, hpcd->IN_ep[epnum].xfer_buff);
 }
 
+// Debug some USB options
 void debugStruc()
 {
     USB_CfgTypeDef *usb = &hpcd_USB_OTG_FS.Init;
@@ -383,7 +384,8 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 
-  HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
+  // fire up buzzer for diagnostics. before main we are silencing it
+  HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_RESET);
 
   /* USER CODE END 1 */
 
@@ -414,17 +416,13 @@ int main(void)
   HAL_PCD_RegisterDataOutStageCallback(&hpcd_USB_OTG_FS, MyPCD_DataOutStageCallback);
   HAL_PCD_RegisterDataInStageCallback(&hpcd_USB_OTG_FS, MyPCD_DataInStageCallback);
 
-
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
+  // silence buzzer
   HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
-
-
-  // HAL_Delay(3000);
-  // BKPT;
 
   while (1)
   {
@@ -432,10 +430,6 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
     morse("C");
-    // oldSofCnt = sofCnt;
-    // HAL_Delay(500);
-    // uint32_t periodsDiff = sofCnt-oldSofCnt;
-    // cdcprintf("\t%d\t%d\r\n ", sofCnt, periodsDiff);
     debugStruc();
     // HAL_Delay(500);
   }

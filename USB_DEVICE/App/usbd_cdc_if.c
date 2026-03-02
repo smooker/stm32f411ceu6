@@ -239,10 +239,8 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
             USBD_SetupReqTypedef* req = (USBD_SetupReqTypedef *)pbuf;           // smooker
             if( (req->wValue & 0x0001) != 0) {
                 CDC_IsConnected = 1;
-                // BKPT;             //smooker
             } else {
                 CDC_IsConnected = 0;
-                // BKPT;            //smooker
             }
         }
     break;
@@ -301,24 +299,11 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
   uint8_t result = USBD_OK;
   /* USER CODE BEGIN 7 */
 
-  // // case connected but terminal not listening on the PC side
-  // if ( hUsbDeviceFS.dev_state == USBD_STATE_CONFIGURED ) {
-  //     // BKPT;           //fixme
-  //     // return USBD_OK;
+  // case unconnected
+  // if ( hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED ) {
+  //     // BKPT;     // handling of non-connected state. do not forget the breakpoint on production.
+  //     return USBD_OK;
   // }
-
-  // // case unconnected
-  if ( hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED ) {
-      // BKPT;     // handling of non-connected state. do not forget the breakpoint on production.
-      return USBD_OK;
-  }
-  __NOP();      //not nops. sttys makes something strange on the device DTR/DSR ?
-  __NOP();
-  __NOP();
-  __NOP();
-  __NOP();
-  __NOP();
-  __NOP();
 
   USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
   if (hcdc->TxState != 0){
@@ -327,6 +312,7 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
 
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, Buf, Len);
   result = USBD_CDC_TransmitPacket(&hUsbDeviceFS);
+
   /* USER CODE END 7 */
   return result;
 }
