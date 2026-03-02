@@ -1234,3 +1234,5 @@
 ./Core/Inc/main.h
 Makefile
 ./Core/Inc/defines.h
+./Core/Inc/eeprom_emul.h
+./Core/Src/eeprom_emul.c

@@ -1,3 +1,3 @@
--std=gnu2x -include ./Core/Inc/defines.h -include ./defines.h -DSTM32F411xE
+-std=gnu2x -include ./Core/Inc/defines.h -include ./defines.h -include ./Core/Inc/main.h -DSTM32F411xE
 #-DSTM32F411xE -I./Core/Inc/
 #-DUSB_OTG_FS -DHAL_HCD_MODULE_ENABLED -DUSE_HAL_PCD_REGISTER_CALLBACKS

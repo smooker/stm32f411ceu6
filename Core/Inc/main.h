@@ -54,6 +54,8 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
+uint8_t cdcprintf(const char *format, ... );
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

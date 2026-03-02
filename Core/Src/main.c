@@ -28,6 +28,7 @@
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
 #include "stm32f4xx_hal.h" // Example for F4
+#include "eeprom_emul.h"
 
 /* USER CODE END Includes */
 
@@ -47,7 +48,6 @@
 void dot();
 void dash();
 uint8_t morse(const char *format, ... );
-uint8_t cdcprintf(const char *format, ... );
 
 /* USER CODE END PD */
 
@@ -424,11 +424,24 @@ int main(void)
   // silence buzzer
   HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
 
+  if ( EEPROM_Init() != EEPROM_OK ) {
+      BKPT;
+  }
+
+  uint16_t asdf = 0x55aa;
+
+  if ( (asdf = EEPROM_WriteVariable(0x0001, 0x55aa)) != 0x00 ) {
+      BKPT;
+  }
+
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+    // SANDBOX
+
     morse("C");
     debugStruc();
     // HAL_Delay(500);
