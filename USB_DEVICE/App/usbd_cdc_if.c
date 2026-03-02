@@ -185,7 +185,6 @@ static int8_t CDC_DeInit_FS(void)
 static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 {
   /* USER CODE BEGIN 5 */
-  // UNUSED(pbuf);      //smooker
   UNUSED(length);      //smooker
 
   switch(cmd)
@@ -237,16 +236,15 @@ static int8_t CDC_Control_FS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
 
     case CDC_SET_CONTROL_LINE_STATE:
         {
-            USBD_SetupReqTypedef* req = (USBD_SetupReqTypedef *)pbuf;
+            USBD_SetupReqTypedef* req = (USBD_SetupReqTypedef *)pbuf;           // smooker
             if( (req->wValue & 0x0001) != 0) {
-                // BKPT;
                 CDC_IsConnected = 1;
+                // BKPT;             //smooker
             } else {
                 CDC_IsConnected = 0;
-                // BKPT;
+                // BKPT;            //smooker
             }
         }
-        CDC_IsConnected = ((USBD_HandleTypeDef*)hpcd_USB_OTG_FS.pData)->request.wValue & 0x01;  //smooker
     break;
 
     case CDC_SEND_BREAK:
@@ -309,20 +307,24 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
   //     // return USBD_OK;
   // }
 
-  // case unconnected
+  // // case unconnected
   if ( hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED ) {
-      // BKPT;     //fixme smooker. handling of non-connected state. do not forget the breakpoint on production.
+      // BKPT;     // handling of non-connected state. do not forget the breakpoint on production.
       return USBD_OK;
   }
+  __NOP();      //not nops. sttys makes something strange on the device DTR/DSR ?
+  __NOP();
+  __NOP();
+  __NOP();
+  __NOP();
+  __NOP();
+  __NOP();
 
   USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
   if (hcdc->TxState != 0){
-      // we have some data waiting for transmit... smooker do not call me too fast.
-      // find out where txstate is getting updated
-      return USBD_OK;
-      // BKPT;
     return USBD_BUSY;
   }
+
   USBD_CDC_SetTxBuffer(&hUsbDeviceFS, Buf, Len);
   result = USBD_CDC_TransmitPacket(&hUsbDeviceFS);
   /* USER CODE END 7 */

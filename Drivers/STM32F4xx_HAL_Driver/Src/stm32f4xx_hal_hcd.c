@@ -629,12 +629,10 @@ void HAL_HCD_IRQHandler(HCD_HandleTypeDef *hhcd)
         {
           if ((USBx_HC(i)->HCCHAR & USB_OTG_HCCHAR_EPDIR) == USB_OTG_HCCHAR_EPDIR)
           {
-                BKPT; //smooker
             HCD_HC_IN_IRQHandler(hhcd, (uint8_t)i);
           }
           else
           {
-                BKPT; //smooker
             HCD_HC_OUT_IRQHandler(hhcd, (uint8_t)i);
           }
         }
@@ -1600,7 +1598,6 @@ static void HCD_HC_IN_IRQHandler(HCD_HandleTypeDef *hhcd, uint8_t chnum)
   */
 static void HCD_HC_OUT_IRQHandler(HCD_HandleTypeDef *hhcd, uint8_t chnum)
 {
-    BKPT; //smooker
   const USB_OTG_GlobalTypeDef *USBx = hhcd->Instance;
   uint32_t USBx_BASE = (uint32_t)USBx;
   uint32_t tmpreg;
@@ -1693,7 +1690,6 @@ static void HCD_HC_OUT_IRQHandler(HCD_HandleTypeDef *hhcd, uint8_t chnum)
       if (hhcd->hc[chnum].speed == HCD_DEVICE_SPEED_HIGH)
       {
         hhcd->hc[chnum].do_ping = 1U;
-          BKPT; //smooker
       }
     }
 

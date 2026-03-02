@@ -62,7 +62,11 @@ uint8_t cdcprintf(const char *format, ... );
 extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
-extern uint8_t CDC_IsConnected;
+extern uint8_t CDC_IsConnected;     //smooker fixme later
+
+
+uint8_t USBconnected = 0;
+uint8_t TCF = 0;        //Transfer Complete Flag for usb cdcprintf
 
 uint32_t sofCnt = 0;
 uint32_t oldSofCnt = 0;
@@ -156,13 +160,9 @@ void dash()
 //
 uint8_t cdcprintf(const char *format, ... )
 {
-    // USE_HAL_PCD_REGISTER_CALLBACKS
-    if (hpcd_USB_OTG_FS.USB_Address == 0) {
-        return  1;      //fixme smooker
-    }
-
-    if ( !CDC_IsConnected ) {
-        return 2;
+    if (!CDC_IsConnected) {
+        // BKPT;
+        return 1;
     }
 
     uint8_t result = USBD_FAIL;
@@ -181,8 +181,10 @@ uint8_t cdcprintf(const char *format, ... )
     va_end(ap);
     uint8_t len = strlen((const char*)&UserTxBufferFS);
 
-    while ( (result != USBD_OK) & (CDC_IsConnected) ) {
-        // here smooker. fixme
+    // TCF = 0;
+
+    // while ( (result != USBD_OK) & (TCF == 0) ) {
+    while ( (result != USBD_OK) ) {
         result = CDC_Transmit_FS(&UserTxBufferFS[0], (uint16_t)len);
     }
 
@@ -252,7 +254,7 @@ uint8_t morse(const char *format, ... )
         HAL_Delay(spaceTime);
         cnt2++;
     }
-    cdcprintf("\t%d\t%d\r\n ", sofCnt, sofCnt-oldSofCnt);
+    cdcprintf("\t%d\t%d\r\n", sofCnt, sofCnt-oldSofCnt);
     oldSofCnt = sofCnt;
     return result; //
 }
@@ -265,13 +267,14 @@ void My_PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
 void My_PCD_ConnectCallback(PCD_HandleTypeDef *hpcd)
 {
     UNUSED(hpcd);
-    // BKPT;
+    USBconnected = 1;
 }
 
 void My_PCD_DisconnectCallback(PCD_HandleTypeDef *hpcd)
 {
     UNUSED(hpcd);
-    // BKPT;
+    USBconnected = 0;
+    CDC_IsConnected = 0;
 }
 
 void delay() {
@@ -314,12 +317,40 @@ void delay() {
 void My_PCD_SOF(PCD_HandleTypeDef *hpcd)
 {
     UNUSED(hpcd);
-    // HAL_GPIO_TogglePin(LED_USER_GPIO_Port, LED_USER_Pin);
     HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
     delay();
     HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_SET);
-    // BKPT;
     sofCnt++;
+}
+
+// DataOut is from HOST to DEVICE
+static void MyPCD_DataOutStageCallback(PCD_HandleTypeDef *hpcd, uint8_t epnum)
+{
+    uint32_t pcount = HAL_PCD_EP_GetRxCount(hpcd, epnum);
+    UNUSED(pcount);
+
+    if (epnum == 0x01)
+    {
+        // Process_My_Custom_Data(hpcd->OUT_ep[epnum].xfer_buff, pcount);
+        HAL_PCD_EP_Receive(hpcd, epnum, hpcd->OUT_ep[epnum].xfer_buff, hpcd->OUT_ep[epnum].xfer_len);
+        // BKPT;       //during setup and later
+    }
+    else
+    {
+        USBD_LL_DataOutStage((USBD_HandleTypeDef*)hpcd->pData, epnum, hpcd->OUT_ep[epnum].xfer_buff);
+    }
+}
+
+// DataIn is from DEVICE to HOST
+void MyPCD_DataInStageCallback(PCD_HandleTypeDef *hpcd, uint8_t epnum)
+{
+    UNUSED(hpcd);
+
+    if (epnum == 0x01) {
+        // BKPT;
+        TCF = 1;
+    }
+    USBD_LL_DataInStage((USBD_HandleTypeDef*)hpcd->pData, epnum, hpcd->IN_ep[epnum].xfer_buff);
 }
 
 void debugStruc()
@@ -380,6 +411,9 @@ int main(void)
   HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_CONNECT_CB_ID,  My_PCD_ConnectCallback);
   HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_DISCONNECT_CB_ID,  My_PCD_DisconnectCallback);
   HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_SOF_CB_ID,  My_PCD_SOF);
+  HAL_PCD_RegisterDataOutStageCallback(&hpcd_USB_OTG_FS, MyPCD_DataOutStageCallback);
+  HAL_PCD_RegisterDataInStageCallback(&hpcd_USB_OTG_FS, MyPCD_DataInStageCallback);
+
 
   /* USER CODE END 2 */
 
@@ -388,25 +422,22 @@ int main(void)
 
   HAL_GPIO_WritePin(BUZZ_GPIO_Port, BUZZ_Pin, GPIO_PIN_SET);
 
-  // cdcprintf("STEPPER %d\r\n", 2024);
 
-  // HAL_Delay(300);
-
-  debugStruc();
+  // HAL_Delay(3000);
+  // BKPT;
 
   while (1)
   {
-      // BKPT;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    // morse("CQ ");
+    morse("C");
     // oldSofCnt = sofCnt;
-    HAL_Delay(1000);
+    // HAL_Delay(500);
     // uint32_t periodsDiff = sofCnt-oldSofCnt;
     // cdcprintf("\t%d\t%d\r\n ", sofCnt, periodsDiff);
     debugStruc();
-    HAL_Delay(1000);
+    // HAL_Delay(500);
   }
   /* USER CODE END 3 */
 }

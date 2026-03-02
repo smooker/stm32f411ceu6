@@ -58,7 +58,7 @@ EndBSPDependencies */
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_cdc.h"
 #include "usbd_ctlreq.h"
-#include "defines.h"
+
 
 /** @addtogroup STM32_USB_DEVICE_LIBRARY
   * @{
@@ -837,8 +837,6 @@ uint8_t USBD_CDC_TransmitPacket(USBD_HandleTypeDef *pdev)
 
     /* Transmit next packet */
     (void)USBD_LL_Transmit(pdev, CDCInEpAdd, hcdc->TxBuffer, hcdc->TxLength);
-
-    // BKPT;
 
     ret = USBD_OK;
   }

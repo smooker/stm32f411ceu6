@@ -568,8 +568,6 @@ USBD_StatusTypeDef USBD_LL_Transmit(USBD_HandleTypeDef *pdev, uint8_t ep_addr, u
 
   usb_status =  USBD_Get_USB_Status(hal_status);
 
-  // BKPT;          //smooker
-
   return usb_status;
 }
 
@@ -627,7 +625,7 @@ USBD_StatusTypeDef USBD_LL_SetTestMode(USBD_HandleTypeDef *pdev, uint8_t testmod
   */
 void *USBD_static_malloc(uint32_t size)
 {
-    UNUSED(size);              //smooker
+    UNUSED(size);
   static uint32_t mem[(sizeof(USBD_CDC_HandleTypeDef)/4)+1];/* On 32-bit boundary */
   return mem;
 }
@@ -639,7 +637,7 @@ void *USBD_static_malloc(uint32_t size)
   */
 void USBD_static_free(void *p)
 {
-    UNUSED(p);              //smooker
+    UNUSED(p);
 }
 
 /**
