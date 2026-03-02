@@ -61,11 +61,9 @@ uint8_t cdcprintf(const char *format, ... );
 /* USER CODE BEGIN PV */
 extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 extern USBD_HandleTypeDef hUsbDeviceFS;
-extern uint8_t UserTxBufferFS;
+extern uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 extern uint8_t CDC_IsConnected;
 
-
-uint8_t buffx[129]  = {0x00};                         //TX buffer
 uint32_t sofCnt = 0;
 uint32_t oldSofCnt = 0;
 
@@ -171,21 +169,21 @@ uint8_t cdcprintf(const char *format, ... )
 
     va_list ap;
 
-    volatile_memset(buffx, 0, sizeof(buffx));
+    // volatile_memset((volatile void*)UserTxBufferFS, 0, sizeof(UserTxBufferFS));
 
     int vsprintfResult;
 
     va_start(ap, format);
-    vsprintfResult = vsprintf((char*)&buffx[0], format, ap);
+    vsprintfResult = vsprintf((char *)&UserTxBufferFS[0], format, ap);
     if ( vsprintfResult < 0 ) {
         BKPT;
     }
     va_end(ap);
-    uint8_t len = strlen((const char*)buffx);
+    uint8_t len = strlen((const char*)&UserTxBufferFS);
 
     while ( (result != USBD_OK) & (CDC_IsConnected) ) {
         // here smooker. fixme
-        result = CDC_Transmit_FS(buffx, (uint16_t)len);
+        result = CDC_Transmit_FS(&UserTxBufferFS[0], (uint16_t)len);
     }
 
     return result; //
