@@ -66,4 +66,6 @@
 #define pulsedur        50                  //puse duration in us
 #define delayafterdir   50                  //delay after set direction pin and before first pulse to come
 
+#define PULSE_TICKS     5000UL   /* ~50us at 96MHz, +100 to compensate ISR latency */
+
 #endif // DEFINES_H

@@ -29,61 +29,12 @@
 #include "usbd_cdc_if.h"
 #include "stm32f4xx_hal.h" // Example for F4
 #include "eeprom_emul_uint32_t.h"
+#include "stepper.h"
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
-union {
-    float f;
-    uint32_t u;
-} float2uint;
-
-typedef struct
-{
-  // float mmpsmax;          // velocity maximum
-  union {
-      float f;
-      uint32_t u;
-  } mmpsmax;
-
-  // float mmpsmin;          // velocity minimum
-  union {
-      float f;
-      uint32_t u;
-  } mmpsmin;
-
-  // float dvdtacc;          // acceleration
-  union {
-      float f;
-      uint32_t u;
-  } dvdtacc;
-
-  // float dvdtdecc;         // decceleration
-  union {
-      float f;
-      uint32_t u;
-  } dvdtdecc;
-
-  // float jogmm;            // jog units
-  union {
-      float f;
-      uint32_t u;
-  } jogmm;
-
-  // float stepmm;           // step units
-  union {
-      float f;
-      uint32_t u;
-  } stepmm;
-
-  // uint32_t spmm;          // steps per mm (conversational unit)
-  union {
-      float f;
-      uint32_t u;
-  } spmm;
-} params_t;
 
 typedef enum {
     KEY_NONE,
@@ -132,6 +83,7 @@ uint8_t CDC_TxWrite(const uint8_t *data, uint16_t len);
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim2;
 
 /* USER CODE BEGIN PV */
 
@@ -154,7 +106,8 @@ static volatile uint16_t rxTail = 0;
 extern uint8_t CDC_IsConnected;
 
 // Locals
-params_t params;
+
+params_t motorParams;
 
 static uint8_t  lineBuf[128];
 static uint16_t lineLen = 0;
@@ -208,6 +161,7 @@ const char* morseCode[] = {
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -269,13 +223,13 @@ void volatile_memset(volatile void *s, int c, size_t n) {
 // parameters init - for debug purposes only
 void initParams()
 {
-  params.mmpsmax.f  = 1.0012f;    // 1 index
-  params.mmpsmin.f  = 1.0023f;    // 2
-  params.dvdtacc.f  = 1.0034f;    // 3
-  params.dvdtdecc.f = 1.0045f;    // 4
-  params.jogmm.f    = 1.0056f;    // 5
-  params.stepmm.f   = 1.0067f;    // 6
-  params.spmm.u     = 4096;       // 7
+  motorParams.mmpsmax.f  = 1.0012f;    // 1 index
+  motorParams.mmpsmin.f  = 1.0023f;    // 2
+  motorParams.dvdtacc.f  = 1.0034f;    // 3
+  motorParams.dvdtdecc.f = 1.0045f;    // 4
+  motorParams.jogmm.f    = 1.0056f;    // 5
+  motorParams.stepmm.f   = 1.0067f;    // 6
+  motorParams.spmm.u     = 4096;       // 7
 }
 
 // debug only
@@ -284,38 +238,38 @@ void writeParams()
   int16_t index = 0;
 
   index++;
-  if (EEPROM_Write(index, params.mmpsmax.u) != EEPROM_OK) {
-    cdcprintf("WRITE 1 FAILED\r\n");
+  if (EEPROM_Write(index, motorParams.mmpsmax.u) != EEPROM_OK) {
+    printf("WRITE 1 FAILED\r\n");
     BKPT;
   }
   index++;
-  if (EEPROM_Write(index, params.mmpsmin.u) != EEPROM_OK) {
-    cdcprintf("WRITE 2 FAILED\r\n");
+  if (EEPROM_Write(index, motorParams.mmpsmin.u) != EEPROM_OK) {
+    printf("WRITE 2 FAILED\r\n");
     BKPT;
   }
   index++;
-  if (EEPROM_Write(index, params.dvdtacc.u) != EEPROM_OK) {
-    cdcprintf("WRITE 3 FAILED\r\n");
+  if (EEPROM_Write(index, motorParams.dvdtacc.u) != EEPROM_OK) {
+    printf("WRITE 3 FAILED\r\n");
     BKPT;
   }
   index++;
-  if (EEPROM_Write(index, params.dvdtdecc.u) != EEPROM_OK) {
-    cdcprintf("WRITE 4 FAILED\r\n");
+  if (EEPROM_Write(index, motorParams.dvdtdecc.u) != EEPROM_OK) {
+    printf("WRITE 4 FAILED\r\n");
     BKPT;
   }
   index++;
-  if (EEPROM_Write(index, params.jogmm.u) != EEPROM_OK) {
-    cdcprintf("WRITE 5 FAILED\r\n");
+  if (EEPROM_Write(index, motorParams.jogmm.u) != EEPROM_OK) {
+    printf("WRITE 5 FAILED\r\n");
     BKPT;
   }
   index++;
-  if (EEPROM_Write(index, params.stepmm.u) != EEPROM_OK) {
-    cdcprintf("WRITE 6 FAILED\r\n");
+  if (EEPROM_Write(index, motorParams.stepmm.u) != EEPROM_OK) {
+    printf("WRITE 6 FAILED\r\n");
     BKPT;
   }
   index++;
-  if (EEPROM_Write(index, params.spmm.u) != EEPROM_OK) {
-    cdcprintf("WRITE 7 FAILED\r\n");
+  if (EEPROM_Write(index, motorParams.spmm.u) != EEPROM_OK) {
+    printf("WRITE 7 FAILED\r\n");
     BKPT;
   }
 }
@@ -327,38 +281,38 @@ void readParams()
     uint16_t index = 0;
 
     index++;
-    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.mmpsmax)) != 0) {
-        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&motorParams.mmpsmax)) != 0) {
+        printf("read %d returned 0x%x\r\n", index, stat);
     }
 
     index++;
-    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.mmpsmin)) != 0) {
-        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&motorParams.mmpsmin)) != 0) {
+        printf("read %d returned 0x%x\r\n", index, stat);
     }
 
     index++;
-    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.dvdtacc)) != 0) {
-        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&motorParams.dvdtacc)) != 0) {
+        printf("read %d returned 0x%x\r\n", index, stat);
     }
 
     index++;
-    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.dvdtdecc)) != 0) {
-        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&motorParams.dvdtdecc)) != 0) {
+        printf("read %d returned 0x%x\r\n", index, stat);
     }
 
     index++;
-    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.jogmm)) != 0) {
-        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&motorParams.jogmm)) != 0) {
+        printf("read %d returned 0x%x\r\n", index, stat);
     }
 
     index++;
-    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.stepmm)) != 0) {
-        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&motorParams.stepmm)) != 0) {
+        printf("read %d returned 0x%x\r\n", index, stat);
     }
 
     index++;
-    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.spmm)) != 0) {
-        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&motorParams.spmm)) != 0) {
+        printf("read %d returned 0x%x\r\n", index, stat);
     }
 }
 
@@ -366,33 +320,33 @@ void readParams()
 void dumpVars()
 {
     // readVariables();
-    // cdcprintf("----------%08d-----\r\n", debugonly++);
-    cdcprintf("Dump of NVARS in EEPROM\r\n");
-    cdcprintf("-----------------------\r\n");
-    cdcprintf("mmpsmax........: %7.3f\r\n", params.mmpsmax.f );
-    cdcprintf("mmpsmin........: %7.3f\r\n", params.mmpsmin.f );
-    cdcprintf("dvdtacc........: %7.3f\r\n", params.dvdtacc.f );
-    cdcprintf("dvdtdecc.......: %7.3f\r\n", params.dvdtdecc.f );
-    cdcprintf("jogmm..........: %7.3f\r\n", params.jogmm.f );
-    cdcprintf("stepmm.........: %7.3f\r\n", params.stepmm.f );
-    cdcprintf("spmm...........: %7d\r\n",  params.spmm.u );
-    cdcprintf("-----------------------\r\n");
-    cdcprintf("semaphore....:  %d\r\n", semaphore);
-    cdcprintf("SEM_EL.......:  %d\r\n", SEM_EL);
-    cdcprintf("SEM_ER.......:  %d\r\n", SEM_ER);
-    cdcprintf("SEM_JOGL.....:  %d\r\n", SEM_JOGL);
-    cdcprintf("SEM_JOGR.....:  %d\r\n", SEM_JOGR);
-    cdcprintf("SEM_JOGSTEPL.:  %d\r\n", SEM_JOGSTEPL);
-    cdcprintf("SEM_JOGSTEPR.:  %d\r\n", SEM_JOGSTEPR);
-    cdcprintf("-----------------------\r\n");
-    cdcprintf("DB_JOGL......:  %d\r\n", DB_JOGL);
-    cdcprintf("DB_JOGR......:  %d\r\n", DB_JOGR);
-    cdcprintf("DB_STEPL.....:  %d\r\n", DB_STEPL);
-    cdcprintf("DB_STEPR.....:  %d\r\n", DB_STEPR);
-    cdcprintf("DB_EL........:  %d\r\n", DB_EL);
-    cdcprintf("DB_ER........:  %d\r\n", DB_ER);
-    cdcprintf("DB_EE........:  %d\r\n", DB_EE);
-    cdcprintf("-----------------------\r\n");
+    // printf("----------%08d-----\r\n", debugonly++);
+    printf("Dump of NVARS in EEPROM\r\n");
+    printf("-----------------------\r\n");
+    printf("mmpsmax........: %7.3f\r\n", motorParams.mmpsmax.f );
+    printf("mmpsmin........: %7.3f\r\n", motorParams.mmpsmin.f );
+    printf("dvdtacc........: %7.3f\r\n", motorParams.dvdtacc.f );
+    printf("dvdtdecc.......: %7.3f\r\n", motorParams.dvdtdecc.f );
+    printf("jogmm..........: %7.3f\r\n", motorParams.jogmm.f );
+    printf("stepmm.........: %7.3f\r\n", motorParams.stepmm.f );
+    printf("spmm...........: %7ld\r\n",  motorParams.spmm.u );
+    printf("-----------------------\r\n");
+    printf("semaphore....:  %ld\r\n", semaphore);
+    printf("SEM_EL.......:  %d\r\n", SEM_EL);
+    printf("SEM_ER.......:  %d\r\n", SEM_ER);
+    printf("SEM_JOGL.....:  %d\r\n", SEM_JOGL);
+    printf("SEM_JOGR.....:  %d\r\n", SEM_JOGR);
+    printf("SEM_JOGSTEPL.:  %d\r\n", SEM_JOGSTEPL);
+    printf("SEM_JOGSTEPR.:  %d\r\n", SEM_JOGSTEPR);
+    printf("-----------------------\r\n");
+    printf("DB_JOGL......:  %d\r\n", DB_JOGL);
+    printf("DB_JOGR......:  %d\r\n", DB_JOGR);
+    printf("DB_STEPL.....:  %d\r\n", DB_STEPL);
+    printf("DB_STEPR.....:  %d\r\n", DB_STEPR);
+    printf("DB_EL........:  %d\r\n", DB_EL);
+    printf("DB_ER........:  %d\r\n", DB_ER);
+    printf("DB_EE........:  %d\r\n", DB_EE);
+    printf("-----------------------\r\n");
 }
 
 // morse dot function
@@ -449,35 +403,6 @@ int _write(int file, char *ptr, int len)
     }
 
     return len;
-}
-
-// console stdout
-uint8_t cdcprintf(const char *format, ... )
-{
-    uint8_t buffx[256] = {0};
-
-    if (!CDC_IsConnected) {
-        // BKPT;
-        return 1;
-    }
-
-    uint8_t result = USBD_FAIL;
-
-    va_list ap;
-
-    int vsprintfResult;
-
-    va_start(ap, format);
-    vsprintfResult = vsprintf((char *)&buffx[0], format, ap);
-    if ( vsprintfResult < 0 ) {
-        BKPT;
-    }
-    va_end(ap);
-
-    uint8_t len = strlen((const char*)&buffx);
-    CDC_TxWrite(buffx, len);
-
-    return result; //
 }
 
 // Morse code transmitter
@@ -693,25 +618,70 @@ void MyPCD_DataInStageCallback(PCD_HandleTypeDef *hpcd, uint8_t epnum)
 void debugStruc()
 {
     USB_CfgTypeDef *usb = &hpcd_USB_OTG_FS.Init;
-    cdcprintf("#########################################\r\n");
-    cdcprintf("sizeof float is %d bytes\r\n", sizeof(float));
-    cdcprintf("-----------------------------------------\r\n");
-    cdcprintf("hpcd_USB_OTG_FS.Init.dev_endpoints:%d\r\n", usb->dev_endpoints);
-    cdcprintf("hpcd_USB_OTG_FS.Init.Host_channels:%d\r\n", usb->Host_channels);
-    cdcprintf("hpcd_USB_OTG_FS.Init.dma_enable:%d\r\n", usb->dma_enable);
-    cdcprintf("hpcd_USB_OTG_FS.Init.speed:%d\r\n", usb->speed);
-    cdcprintf("hpcd_USB_OTG_FS.Init.ep0_mps:%d\r\n", usb->ep0_mps);
-    cdcprintf("hpcd_USB_OTG_FS.Init.phy_itface:%d\r\n", usb->phy_itface);
-    cdcprintf("hpcd_USB_OTG_FS.Init.Sof_enable:%d\r\n", usb->Sof_enable);
-    cdcprintf("hpcd_USB_OTG_FS.Init.low_power_enable:%d\r\n", usb->low_power_enable);
-    cdcprintf("hpcd_USB_OTG_FS.Init.lpm_enable:%d\r\n", usb->lpm_enable);
-    cdcprintf("hpcd_USB_OTG_FS.Init.battery_charging_enable:%d\r\n", usb->battery_charging_enable);
-    cdcprintf("hpcd_USB_OTG_FS.Init.vbus_sensing_enable:%d\r\n", usb->vbus_sensing_enable);
-    cdcprintf("hpcd_USB_OTG_FS.Init.use_dedicated_ep1:%d\r\n", usb->use_dedicated_ep1);
-    cdcprintf("hpcd_USB_OTG_FS.Init.use_external_vbus:%d\r\n", usb->use_external_vbus);
+    printf("#########################################\r\n");
+    printf("sizeof float is %d bytes\r\n", sizeof(float));
+    printf("-----------------------------------------\r\n");
+    printf("hpcd_USB_OTG_FS.Init.dev_endpoints:%d\r\n", usb->dev_endpoints);
+    printf("hpcd_USB_OTG_FS.Init.Host_channels:%d\r\n", usb->Host_channels);
+    printf("hpcd_USB_OTG_FS.Init.dma_enable:%d\r\n", usb->dma_enable);
+    printf("hpcd_USB_OTG_FS.Init.speed:%d\r\n", usb->speed);
+    printf("hpcd_USB_OTG_FS.Init.ep0_mps:%d\r\n", usb->ep0_mps);
+    printf("hpcd_USB_OTG_FS.Init.phy_itface:%d\r\n", usb->phy_itface);
+    printf("hpcd_USB_OTG_FS.Init.Sof_enable:%d\r\n", usb->Sof_enable);
+    printf("hpcd_USB_OTG_FS.Init.low_power_enable:%d\r\n", usb->low_power_enable);
+    printf("hpcd_USB_OTG_FS.Init.lpm_enable:%d\r\n", usb->lpm_enable);
+    printf("hpcd_USB_OTG_FS.Init.battery_charging_enable:%d\r\n", usb->battery_charging_enable);
+    printf("hpcd_USB_OTG_FS.Init.vbus_sensing_enable:%d\r\n", usb->vbus_sensing_enable);
+    printf("hpcd_USB_OTG_FS.Init.use_dedicated_ep1:%d\r\n", usb->use_dedicated_ep1);
+    printf("hpcd_USB_OTG_FS.Init.use_external_vbus:%d\r\n", usb->use_external_vbus);
 }
 
 void ProcessLine(void)
+{
+    char  cmd[16];
+    char  param[16];
+    float fval;
+    int   ival;
+
+    if (sscanf((char *)lineBuf, "set %s %f", param, &fval) == 2)
+    {
+        Stepper_SetParam(param, fval);
+    }
+    else if (sscanf((char *)lineBuf, "move %f", &fval) == 1)
+    {
+        Stepper_Move(fval);
+    }
+    else if (sscanf((char *)lineBuf, "steps %d", &ival) == 1)
+    {
+        Stepper_MoveSteps(ival);
+    }
+    else if (sscanf((char *)lineBuf, "%s", cmd) == 1)
+    {
+        if      (strcmp(cmd, "stop")   == 0) Stepper_Stop();
+        else if (strcmp(cmd, "params") == 0) Stepper_DumpParams();
+        else if (strcmp(cmd, "save")   == 0) Stepper_SaveParams();
+        else if (strcmp(cmd, "dump")   == 0) dumpVars();
+        else if (strcmp(cmd, "cls")    == 0) printf("\033[2J\033[H>");
+        else if (strcmp(cmd, "uptime") == 0) printf("uptime: %lu ms\r\n", HAL_GetTick());
+        else if (strcmp(cmd, "reset")  == 0) NVIC_SystemReset();
+        else if (strcmp(cmd, "help")   == 0)
+            printf("commands:\r\n"
+                      "  move <mm>          move by mm\r\n"
+                      "  steps <n>          move by steps\r\n"
+                      "  set mmpsmax  <f>   max velocity mm/s\r\n"
+                      "  set mmpsmin  <f>   min velocity mm/s\r\n"
+                      "  set dvdtacc  <f>   accel mm/s2\r\n"
+                      "  set dvdtdecc <f>   decel mm/s2\r\n"
+                      "  set jogmm    <f>   jog distance mm\r\n"
+                      "  set stepmm   <f>   step distance mm\r\n"
+                      "  set spmm     <n>   steps per mm\r\n"
+                      "  params, save, dump, stop, cls, uptime, reset\r\n");
+        else
+            printf("unknown: %s\r\n", cmd);
+    }
+}
+
+void ProcessLineOld(void)
 {
     char cmd[16];
     float f1, f2;
@@ -779,6 +749,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USB_DEVICE_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
   setvbuf(stdout, NULL, _IONBF, 0);  /* disable buffering entirely */
@@ -803,6 +774,8 @@ int main(void)
   if ( EEPROM_Init() != EEPROM_OK ) {
       BKPT;
   }
+
+  Stepper_Init(&htim2);
 
   // USB enumeration
   HAL_Delay(1200);
@@ -933,6 +906,55 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 9599;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_PWM_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 4800;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+  HAL_TIM_MspPostInit(&htim2);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -953,7 +975,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, PULSE_Pin|DIR_Pin|BUZZ_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, DIR_Pin|BUZZ_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : LED_USER_Pin */
   GPIO_InitStruct.Pin = LED_USER_Pin;
@@ -974,8 +996,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PULSE_Pin DIR_Pin BUZZ_Pin */
-  GPIO_InitStruct.Pin = PULSE_Pin|DIR_Pin|BUZZ_Pin;
+  /*Configure GPIO pins : DIR_Pin BUZZ_Pin */
+  GPIO_InitStruct.Pin = DIR_Pin|BUZZ_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

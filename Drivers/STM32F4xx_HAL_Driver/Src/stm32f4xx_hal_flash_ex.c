@@ -947,7 +947,7 @@ static HAL_StatusTypeDef FLASH_OB_DisablePCROP(uint32_t SectorBank1, uint32_t Se
   */
 static void FLASH_MassErase(uint8_t VoltageRange, uint32_t Banks)
 {
-    UNUSED(Banks);
+    UNUSED(Banks);          //smooker
   /* Check the parameters */
   assert_param(IS_VOLTAGERANGE(VoltageRange));
   assert_param(IS_FLASH_BANK(Banks));

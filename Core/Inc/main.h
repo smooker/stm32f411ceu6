@@ -37,6 +37,24 @@ extern "C" {
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
 
+typedef struct
+{
+    union { float f; uint32_t u; } mmpsmax;
+    union { float f; uint32_t u; } mmpsmin;
+    union { float f; uint32_t u; } dvdtacc;
+    union { float f; uint32_t u; } dvdtdecc;
+    union { float f; uint32_t u; } jogmm;
+    union { float f; uint32_t u; } stepmm;
+    union { float f; uint32_t u; } spmm;
+} params_t;
+
+extern union {
+    float f;
+    uint32_t u;
+} float2uint;
+
+extern params_t motorParams;
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
@@ -49,12 +67,14 @@ extern "C" {
 
 /* USER CODE END EM */
 
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
+
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
-uint8_t cdcprintf(const char *format, ... );
+// uint8_t cdcprintf(const char *format, ... );
 void MyCDC_Receive_FS(uint8_t *Buff, uint32_t *Len);
 
 /* USER CODE END EFP */
@@ -74,7 +94,7 @@ void MyCDC_Receive_FS(uint8_t *Buff, uint32_t *Len);
 #define BUTT_STEPL_GPIO_Port GPIOB
 #define BUTT_STEPR_Pin GPIO_PIN_1
 #define BUTT_STEPR_GPIO_Port GPIOB
-#define PULSE_Pin GPIO_PIN_13
+#define PULSE_Pin GPIO_PIN_10
 #define PULSE_GPIO_Port GPIOB
 #define DIR_Pin GPIO_PIN_14
 #define DIR_GPIO_Port GPIOB
