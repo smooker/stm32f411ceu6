@@ -55,6 +55,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN EFP */
 
 uint8_t cdcprintf(const char *format, ... );
+void MyCDC_Receive_FS(uint8_t *Buff, uint32_t *Len);
 
 /* USER CODE END EFP */
 

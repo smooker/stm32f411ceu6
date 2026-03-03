@@ -115,6 +115,7 @@ uint8_t morse(const char *format, ... );
 extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 extern USBD_HandleTypeDef hUsbDeviceFS;
 extern uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
+extern uint8_t UserRxBufferFS[APP_TX_DATA_SIZE];
 extern uint8_t CDC_IsConnected;
 
 // Locals
@@ -509,29 +510,33 @@ void My_PCD_SOF(PCD_HandleTypeDef *hpcd)
     // HAL_GPIO_WritePin(LED_USER_GPIO_Port, LED_USER_Pin, GPIO_PIN_SET);
 }
 
+//
+void MyCDC_Receive_FS(uint8_t *Buf, uint32_t *Len)
+{
+    UNUSED(Len);
+    cdcprintf("\r\n>%s\r\n", Buf);
+}
+
 // DataOut is from HOST to DEVICE
 static void MyPCD_DataOutStageCallback(PCD_HandleTypeDef *hpcd, uint8_t epnum)
 {
-    uint32_t pcount = HAL_PCD_EP_GetRxCount(hpcd, epnum);
-    UNUSED(pcount);
+    // uint32_t pcount = HAL_PCD_EP_GetRxCount(hpcd, epnum);
 
     if (epnum == 0x01)
     {
         // Process_My_Custom_Data(hpcd->OUT_ep[epnum].xfer_buff, pcount);
         HAL_PCD_EP_Receive(hpcd, epnum, hpcd->OUT_ep[epnum].xfer_buff, hpcd->OUT_ep[epnum].xfer_len);
-        // BKPT;       //during setup and later
     }
     else
     {
-        USBD_LL_DataOutStage((USBD_HandleTypeDef*)hpcd->pData, epnum, hpcd->OUT_ep[epnum].xfer_buff);
+
     }
+    USBD_LL_DataOutStage((USBD_HandleTypeDef*)hpcd->pData, epnum, hpcd->OUT_ep[epnum].xfer_buff);
 }
 
 // DataIn is from DEVICE to HOST
 void MyPCD_DataInStageCallback(PCD_HandleTypeDef *hpcd, uint8_t epnum)
 {
-    UNUSED(hpcd);
-
     if (epnum == 0x01) {
         TCFlag = 1;
     }
@@ -600,7 +605,10 @@ int main(void)
   HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_CONNECT_CB_ID,  My_PCD_ConnectCallback);
   HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_DISCONNECT_CB_ID,  My_PCD_DisconnectCallback);
   HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_SOF_CB_ID,  My_PCD_SOF);
+
+  // FROM HOST TO DEVICE
   HAL_PCD_RegisterDataOutStageCallback(&hpcd_USB_OTG_FS, MyPCD_DataOutStageCallback);
+  // FROM DEVICE TO HOST
   HAL_PCD_RegisterDataInStageCallback(&hpcd_USB_OTG_FS, MyPCD_DataInStageCallback);
 
   /* USER CODE END 2 */
@@ -634,7 +642,7 @@ int main(void)
 
     morse("C");
     // debugStruc();
-    dumpVars();
+    // dumpVars();
     // HAL_Delay(500);
   }
   /* USER CODE END 3 */
