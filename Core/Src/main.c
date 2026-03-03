@@ -96,12 +96,17 @@ typedef enum {
     KEY_ENTER,
     KEY_BACKSPACE,
     KEY_CLEAR,
+    KEY_F1,
+    KEY_F2,
+    KEY_F3,
+    KEY_F4,
 } KeyCode;
 
 typedef enum {
     SEQ_IDLE,
     SEQ_ESC,
     SEQ_BRACKET,
+    SEQ_O,
 } SeqState;
 
 /* USER CODE END PTD */
@@ -135,13 +140,13 @@ extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 extern USBD_HandleTypeDef hUsbDeviceFS;
 
 //
-#define RX_BUF_SIZE  256
+#define RX_BUF_SIZE  512
 static uint8_t UserTxBufferFS[RX_BUF_SIZE];
 static volatile uint16_t txLen   = 0;
 static volatile uint8_t  txBusy  = 0;
 
 //
-#define TX_BUF_SIZE  256
+#define TX_BUF_SIZE  512
 static uint8_t UserRxBufferFS[TX_BUF_SIZE];
 static volatile uint16_t rxHead = 0;
 static volatile uint16_t rxTail = 0;
@@ -218,9 +223,9 @@ KeyCode ParseKey(uint8_t byte)
     switch (state)
     {
     case SEQ_IDLE:
-        if      (byte == 0x1B) { state = SEQ_ESC;      return KEY_SEQUENCE; }
-        else if (byte == '\r' || byte == '\n')         return KEY_ENTER;
-        else if (byte == 0x7F || byte == 0x08)         return KEY_BACKSPACE;
+        if      (byte == 0x1B) { state = SEQ_ESC;               return KEY_SEQUENCE; }
+        else if (byte == '\r' || byte == '\n' || byte == 0x8D)  return KEY_ENTER;
+        else if (byte == 0x7F || byte == 0x08 )         return KEY_BACKSPACE;
         else if (byte == 0x0C) {
             return KEY_CLEAR;  // Ctrl+L
         }
@@ -228,8 +233,18 @@ KeyCode ParseKey(uint8_t byte)
 
     case SEQ_ESC:
         if (byte == '[') { state = SEQ_BRACKET; return KEY_SEQUENCE; }
+        else if (byte == 'O') { state = SEQ_O;       return KEY_SEQUENCE; }
         state = SEQ_IDLE;
         return KEY_ESC;
+
+    case SEQ_O:
+        state = SEQ_IDLE;
+        if (byte == 'M') return KEY_ENTER;   // keypad Enter
+        if (byte == 'P') return KEY_F1;      // bonus: F1-F4 also use ESC O
+        if (byte == 'Q') return KEY_F2;
+        if (byte == 'R') return KEY_F3;
+        if (byte == 'S') return KEY_F4;
+        break;
 
     case SEQ_BRACKET:
         state = SEQ_IDLE;
@@ -424,6 +439,15 @@ int _write(int file, char *ptr, int len)
     }
 
     CDC_Transmit_FS((uint8_t *)ptr, len);
+
+    /* wait for this transmission to complete before returning */
+    timeout = HAL_GetTick();
+    while (hcdc->TxState != 0)
+    {
+        if (HAL_GetTick() - timeout > 100)
+            return 0;
+    }
+
     return len;
 }
 
@@ -687,16 +711,37 @@ void debugStruc()
     cdcprintf("hpcd_USB_OTG_FS.Init.use_external_vbus:%d\r\n", usb->use_external_vbus);
 }
 
-void ProcessLine(uint8_t *buf, uint16_t len)
+void ProcessLine(void)
 {
-    uint8_t resp[128];
-    uint16_t pos = 0;
+    char cmd[16];
+    float f1, f2;
+    int   i1;
+    // int  arg1, arg2;
 
-    memcpy(&resp[pos], " Got: ", 5);  pos += 5;
-    memcpy(&resp[pos], buf, len);    pos += len;
-    memcpy(&resp[pos], "\r\n", 2);   pos += 2;
-
-    CDC_Transmit_FS(resp, pos);
+    if (sscanf((char *)lineBuf, "%s %f %f", cmd, &f1, &f2) == 3)
+    {
+        printf(" cmd: %s, f1: %.3f, f2: %.3f\r\n", cmd, f1, f2);
+    }
+    else if (sscanf((char *)lineBuf, "%s %f", cmd, &f1) == 2)
+    {
+        printf(" cmd: %s, f1: %.3f\r\n", cmd, f1);
+    }
+    else if (sscanf((char *)lineBuf, "%s %d", cmd, &i1) == 2)
+    {
+        printf(" cmd: %s, i1: %d\r\n", cmd, i1);
+    }
+    else if (sscanf((char *)lineBuf, "%s", cmd) == 1)
+    {
+        if      (strcmp(cmd, "help")   == 0) printf("commands: help, cls, reset\r\n");
+        else if (strcmp(cmd, "cls")    == 0) printf("\033[2J\033[H>");
+        else if (strcmp(cmd, "reset")  == 0) NVIC_SystemReset();
+        else if (strcmp(cmd, "uptime") == 0) printf("uptime: %lu ms\r\n", HAL_GetTick());
+        else                                 printf("unknown command: %s\r\n", cmd);
+    }
+    else
+    {
+        printf("unknown command\r\n");
+    }
 }
 
 /* USER CODE END 0 */
@@ -804,7 +849,7 @@ int main(void)
             if (lineLen > 0)
             {
                 lineBuf[lineLen] = '\0';  /* null terminate for sscanf */
-                ProcessLine(lineBuf, lineLen);
+                ProcessLine();
                 lineLen = 0;
             }
             break;
@@ -826,19 +871,18 @@ int main(void)
                 printf("%c", b);
             }
             break;
+        case KEY_F1:  printf("F1\r\n");  break;
+        case KEY_F2:  printf("F2\r\n");  break;
+        case KEY_F3:  printf("F3\r\n");  break;
+        case KEY_F4:  printf("F4\r\n");  break;
 
         default: break;
         }
     }
-    // TxStart(); // keep retrying until it goes through
 
     // morse("C");
-    // if (CDC_RxAvailable()) {
-    //     cdcprintf("neshto doide po zhicata....\r\n");
-    // }
     // debugStruc();
     // dumpVars();
-    // HAL_Delay(500);
   }
   /* USER CODE END 3 */
 }
