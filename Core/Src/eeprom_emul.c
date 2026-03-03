@@ -161,7 +161,7 @@ uint16_t EEPROM_Init(void)
         return PageTransfer(1, 0);
 
     /* Both pages erased or corrupt: format */
-    BKPT;           //fixme smooker
+    // BKPT;           //fixme smooker
     return EEPROM_Format();
 }
 

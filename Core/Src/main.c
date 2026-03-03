@@ -28,7 +28,7 @@
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
 #include "stm32f4xx_hal.h" // Example for F4
-#include "eeprom_emul.h"
+#include "eeprom_emul_uint32_t.h"
 
 /* USER CODE END Includes */
 
@@ -430,7 +430,7 @@ int main(void)
 
   uint16_t asdf = 0x55aa;
 
-  if ( (asdf = EEPROM_WriteVariable(0x0001, 0x55aa)) != 0x00 ) {
+  if ( (asdf = EEPROM_Write(0x0001, 0x55aa50a0)) != 0x00 ) {
       BKPT;
   }
 

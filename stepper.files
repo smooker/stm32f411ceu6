@@ -1236,3 +1236,5 @@ Makefile
 ./Core/Inc/defines.h
 ./Core/Inc/eeprom_emul.h
 ./Core/Src/eeprom_emul.c
+./Core/Inc/eeprom_emul_uint32_t.h
+./Core/Src/eeprom_emul_uint32_t.c

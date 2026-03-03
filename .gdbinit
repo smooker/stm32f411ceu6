@@ -2382,7 +2382,7 @@ python Dashboard.start()
 # End:
 
 #define l
-#load build/scales_stepper_stm32.hex 
+#load build/scales_stepper_stm32.hex
 #end
 
 set style address intensity bold
@@ -2394,15 +2394,19 @@ set style disassembler immediate intensity bold
 set print elements 0
 
 define pr
-p/xz arrRam
-p/xz arrFlash
-#p/xz *(unsigned short*) *0x0800f000@128
-p/xz *(unsigned short*) 0x0800f000@256
+#p/xz arrRam
+#p/xz arrFlash
+#p/xz *(unsigned short*) *0x08040000@256
+#p/xz *(unsigned short*) *0x08060000@256
+#p/xz *0x08040000UL@256
+#p/xz *0x08060000UL@256
+p/xz *(unsigned*) 0x08040000UL@32768
+p/xz *(unsigned*) 0x08060000UL@32768
 end
 
 define ld
 file ./build/stepper.elf
-load ./build/stepper.hex 
+load ./build/stepper.hex
 set remote exec-file ./build/stepper.elf
 compare-sections
 end
@@ -2422,3 +2426,6 @@ p/xz crcOld
 p/xz crcNew
 end
 set auto-load safe-path .
+
+set max-value-size unlimited
+
