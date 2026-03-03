@@ -35,15 +35,55 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
+union {
+    float f;
+    uint32_t u;
+} float2uint;
+
+
 typedef struct
 {
-  float mmpsmax;          // velocity maximum
-  float mmpsmin;          // velocity minimum
-  float dvdtacc;          // acceleration
-  float dvdtdecc;         // decceleration
-  float jogmm;            // jog units
-  float stepmm;           // step units
-  uint32_t spmm;          // steps per mm (conversational unit)
+  // float mmpsmax;          // velocity maximum
+  union {
+      float f;
+      uint32_t u;
+  } mmpsmax;
+
+  // float mmpsmin;          // velocity minimum
+  union {
+      float f;
+      uint32_t u;
+  } mmpsmin;
+
+  // float dvdtacc;          // acceleration
+  union {
+      float f;
+      uint32_t u;
+  } dvdtacc;
+
+  // float dvdtdecc;         // decceleration
+  union {
+      float f;
+      uint32_t u;
+  } dvdtdecc;
+
+  // float jogmm;            // jog units
+  union {
+      float f;
+      uint32_t u;
+  } jogmm;
+
+  // float stepmm;           // step units
+  union {
+      float f;
+      uint32_t u;
+  } stepmm;
+
+  // uint32_t spmm;          // steps per mm (conversational unit)
+  union {
+      float f;
+      uint32_t u;
+  } spmm;
 } params_t;
 
 /* USER CODE END PTD */
@@ -148,28 +188,114 @@ void volatile_memset(volatile void *s, int c, size_t n) {
 // parameters init - for debug purposes only
 void initParams()
 {
-  params.mmpsmax  = 1.0012f;
-  params.mmpsmin  = 1.0023f;
-  params.dvdtacc  = 1.0034f;
-  params.dvdtdecc = 1.0045f;
-  params.jogmm    = 1.0056f;
-  params.stepmm   = 1.0067f;
-  params.spmm     = 4096;
+  params.mmpsmax.f  = 1.0012f;    // 1 index
+  params.mmpsmin.f  = 1.0023f;    // 2
+  params.dvdtacc.f  = 1.0034f;    // 3
+  params.dvdtdecc.f = 1.0045f;    // 4
+  params.jogmm.f    = 1.0056f;    // 5
+  params.stepmm.f   = 1.0067f;    // 6
+  params.spmm.u     = 4096;       // 7
 }
 
+// debug only
+void writeParams()
+{
+  int16_t index = 0;
+
+  index++;
+  if (EEPROM_Write(index, params.mmpsmax.u) != EEPROM_OK) {
+    cdcprintf("WRITE 1 FAILED\r\n");
+    BKPT;
+  }
+  index++;
+  if (EEPROM_Write(index, params.mmpsmin.u) != EEPROM_OK) {
+    cdcprintf("WRITE 2 FAILED\r\n");
+    BKPT;
+  }
+  index++;
+  if (EEPROM_Write(index, params.dvdtacc.u) != EEPROM_OK) {
+    cdcprintf("WRITE 3 FAILED\r\n");
+    BKPT;
+  }
+  index++;
+  if (EEPROM_Write(index, params.dvdtdecc.u) != EEPROM_OK) {
+    cdcprintf("WRITE 4 FAILED\r\n");
+    BKPT;
+  }
+  index++;
+  if (EEPROM_Write(index, params.jogmm.u) != EEPROM_OK) {
+    cdcprintf("WRITE 5 FAILED\r\n");
+    BKPT;
+  }
+  index++;
+  if (EEPROM_Write(index, params.stepmm.u) != EEPROM_OK) {
+    cdcprintf("WRITE 6 FAILED\r\n");
+    BKPT;
+  }
+  index++;
+  if (EEPROM_Write(index, params.spmm.u) != EEPROM_OK) {
+    cdcprintf("WRITE 7 FAILED\r\n");
+    BKPT;
+  }
+}
+
+
+//
+void readParams()
+{
+    int16_t stat;
+    uint16_t index = 0;
+
+    index++;
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.mmpsmax)) != 0) {
+        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    }
+
+    index++;
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.mmpsmin)) != 0) {
+        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    }
+
+    index++;
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.dvdtacc)) != 0) {
+        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    }
+
+    index++;
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.dvdtdecc)) != 0) {
+        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    }
+
+    index++;
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.jogmm)) != 0) {
+        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    }
+
+    index++;
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.stepmm)) != 0) {
+        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    }
+
+    index++;
+    if ( (stat = EEPROM_Read(index, (uint32_t*)&params.spmm)) != 0) {
+        cdcprintf("read %d returned 0x%x\r\n", index, stat);
+    }
+}
+
+//
 void dumpVars()
 {
     // readVariables();
     // cdcprintf("----------%08d-----\r\n", debugonly++);
     cdcprintf("Dump of NVARS in EEPROM\r\n");
     cdcprintf("-----------------------\r\n");
-    cdcprintf("mmpsmax........: %7.3f\r\n", params.mmpsmax );
-    cdcprintf("mmpsmin........: %7.3f\r\n", params.mmpsmin );
-    cdcprintf("dvdtacc........: %7.3f\r\n", params.dvdtacc );
-    cdcprintf("dvdtdecc.......: %7.3f\r\n", params.dvdtdecc );
-    cdcprintf("jogmm..........: %7.3f\r\n", params.jogmm );
-    cdcprintf("stepmm.........: %7.3f\r\n", params.stepmm );
-    cdcprintf("spmm...........: %7d\r\n",  params.spmm );
+    cdcprintf("mmpsmax........: %7.3f\r\n", params.mmpsmax.f );
+    cdcprintf("mmpsmin........: %7.3f\r\n", params.mmpsmin.f );
+    cdcprintf("dvdtacc........: %7.3f\r\n", params.dvdtacc.f );
+    cdcprintf("dvdtdecc.......: %7.3f\r\n", params.dvdtdecc.f );
+    cdcprintf("jogmm..........: %7.3f\r\n", params.jogmm.f );
+    cdcprintf("stepmm.........: %7.3f\r\n", params.stepmm.f );
+    cdcprintf("spmm...........: %7d\r\n",  params.spmm.u );
     cdcprintf("-----------------------\r\n");
     cdcprintf("semaphore....:  %d\r\n", semaphore);
     cdcprintf("SEM_EL.......:  %d\r\n", SEM_EL);
@@ -489,16 +615,14 @@ int main(void)
       BKPT;
   }
 
-  initParams();
-
   // USB enumeration
   HAL_Delay(1200);
 
-  uint16_t asdf = 0x55aa;
-
-  if ( (asdf = EEPROM_Write(0x0001, 0x55aa50a0)) != 0x00 ) {
-      BKPT;
-  }
+  // initParams();
+  // writeParams();
+  // BKPT;
+  readParams();
+  // BKPT;
 
   while (1)
   {
