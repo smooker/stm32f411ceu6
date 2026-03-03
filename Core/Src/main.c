@@ -40,7 +40,6 @@ union {
     uint32_t u;
 } float2uint;
 
-
 typedef struct
 {
   // float mmpsmax;          // velocity maximum
@@ -86,6 +85,24 @@ typedef struct
   } spmm;
 } params_t;
 
+typedef enum {
+    KEY_NONE,
+    KEY_SEQUENCE,
+    KEY_UP,
+    KEY_DOWN,
+    KEY_LEFT,
+    KEY_RIGHT,
+    KEY_ESC,
+    KEY_ENTER,
+    KEY_BACKSPACE,
+} KeyCode;
+
+typedef enum {
+    SEQ_IDLE,
+    SEQ_ESC,
+    SEQ_BRACKET,
+} SeqState;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -99,6 +116,7 @@ typedef struct
 void dot();
 void dash();
 uint8_t morse(const char *format, ... );
+uint8_t CDC_TxWrite(const uint8_t *data, uint16_t len);
 
 /* USER CODE END PD */
 
@@ -114,13 +132,26 @@ uint8_t morse(const char *format, ... );
 //Externs
 extern PCD_HandleTypeDef hpcd_USB_OTG_FS;
 extern USBD_HandleTypeDef hUsbDeviceFS;
-extern uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
-extern uint8_t UserRxBufferFS[APP_TX_DATA_SIZE];
+
+//
+#define RX_BUF_SIZE  256
+static uint8_t UserTxBufferFS[RX_BUF_SIZE];
+static volatile uint16_t txLen   = 0;
+static volatile uint8_t  txBusy  = 0;
+
+//
+#define TX_BUF_SIZE  256
+static uint8_t UserRxBufferFS[TX_BUF_SIZE];
+static volatile uint16_t rxHead = 0;
+static volatile uint16_t rxTail = 0;
+//
 extern uint8_t CDC_IsConnected;
 
 // Locals
-uint8_t TCFlag = 0;        //Transfer Complete Flag for usb cdcprintf
 params_t params;
+
+static uint8_t  lineBuf[128];
+static uint16_t lineLen = 0;
 
 //
 uint32_t semaphore = 0;    // state machine flags
@@ -177,6 +208,36 @@ static void MX_GPIO_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+//
+KeyCode ParseKey(uint8_t byte)
+{
+    static SeqState state = SEQ_IDLE;
+
+    switch (state)
+    {
+    case SEQ_IDLE:
+        if      (byte == 0x1B) { state = SEQ_ESC;      return KEY_SEQUENCE; }
+        else if (byte == '\r' || byte == '\n')         return KEY_ENTER;
+        else if (byte == 0x7F || byte == 0x08)         return KEY_BACKSPACE;
+        break;
+
+    case SEQ_ESC:
+        if (byte == '[') { state = SEQ_BRACKET; return KEY_SEQUENCE; }
+        state = SEQ_IDLE;
+        return KEY_ESC;
+
+    case SEQ_BRACKET:
+        state = SEQ_IDLE;
+        if      (byte == 'A') return KEY_UP;
+        else if (byte == 'B') return KEY_DOWN;
+        else if (byte == 'C') return KEY_RIGHT;
+        else if (byte == 'D') return KEY_LEFT;
+        break;
+    }
+
+    return KEY_NONE;
+}
 
 // my memset
 void volatile_memset(volatile void *s, int c, size_t n) {
@@ -239,7 +300,6 @@ void writeParams()
     BKPT;
   }
 }
-
 
 //
 void readParams()
@@ -344,9 +404,18 @@ void dash()
     HAL_Delay(interTime);
 }
 
+int _write(int file, char *ptr, int len)
+{
+    UNUSED(file);
+    CDC_Transmit_FS((uint8_t *)ptr, len);
+    return len;
+}
+
 // console stdout
 uint8_t cdcprintf(const char *format, ... )
 {
+    uint8_t buffx[256] = {0};
+
     if (!CDC_IsConnected) {
         // BKPT;
         return 1;
@@ -356,21 +425,17 @@ uint8_t cdcprintf(const char *format, ... )
 
     va_list ap;
 
-    // volatile_memset((volatile void*)UserTxBufferFS, 0, sizeof(UserTxBufferFS));
-
     int vsprintfResult;
 
     va_start(ap, format);
-    vsprintfResult = vsprintf((char *)&UserTxBufferFS[0], format, ap);
+    vsprintfResult = vsprintf((char *)&buffx[0], format, ap);
     if ( vsprintfResult < 0 ) {
         BKPT;
     }
     va_end(ap);
-    uint8_t len = strlen((const char*)&UserTxBufferFS);
 
-    while ( (result != USBD_OK) ) {
-        result = CDC_Transmit_FS(&UserTxBufferFS[0], (uint16_t)len);
-    }
+    uint8_t len = strlen((const char*)&buffx);
+    CDC_TxWrite(buffx, len);
 
     return result; //
 }
@@ -511,36 +576,77 @@ void My_PCD_SOF(PCD_HandleTypeDef *hpcd)
 }
 
 //
+static void TxStart(void)
+{
+    if (txBusy || txLen == 0) return;
+    txBusy = 1;
+    /* txLen intentionally NOT cleared here — buffer must stay valid */
+    uint8_t result = CDC_Transmit_FS(UserTxBufferFS, txLen);
+    if (result == USBD_OK)
+    {
+        txBusy = 1;
+        txLen  = 0;
+    }
+}
+
+//
 void MyCDC_Receive_FS(uint8_t *Buf, uint32_t *Len)
 {
-    UNUSED(Len);
-    cdcprintf("\r\n>%s\r\n", Buf);
+    for (uint32_t i = 0; i < *Len; i++)
+    {
+        uint16_t next = (rxHead + 1) % RX_BUF_SIZE;
+        if (next != rxTail)
+        {
+            UserRxBufferFS[rxHead] = Buf[i];
+            rxHead = next;
+        }
+    }
+}
+
+/* Read one byte from RX buffer. Call CDC_RxAvailable() first. */
+uint8_t CDC_RxAvailable(void)
+{
+    return rxHead != rxTail;
+}
+
+uint8_t CDC_RxRead(void)
+{
+    uint8_t byte = UserRxBufferFS[rxTail];
+    rxTail = (rxTail + 1) % APP_RX_DATA_SIZE;
+    return byte;
+}
+
+/* Queue bytes for async TX. Returns 0 if TX buffer full. */
+uint8_t CDC_TxWrite(const uint8_t *data, uint16_t len)
+{
+    if (txBusy || (txLen + len) > APP_TX_DATA_SIZE)
+        return 0; /* busy or won't fit */
+
+    memcpy(&UserTxBufferFS[txLen], data, len);
+    txLen += len;
+    TxStart();
+    return 1;
 }
 
 // DataOut is from HOST to DEVICE
 static void MyPCD_DataOutStageCallback(PCD_HandleTypeDef *hpcd, uint8_t epnum)
 {
-    // uint32_t pcount = HAL_PCD_EP_GetRxCount(hpcd, epnum);
-
-    if (epnum == 0x01)
-    {
-        // Process_My_Custom_Data(hpcd->OUT_ep[epnum].xfer_buff, pcount);
-        HAL_PCD_EP_Receive(hpcd, epnum, hpcd->OUT_ep[epnum].xfer_buff, hpcd->OUT_ep[epnum].xfer_len);
-    }
-    else
-    {
-
-    }
-    USBD_LL_DataOutStage((USBD_HandleTypeDef*)hpcd->pData, epnum, hpcd->OUT_ep[epnum].xfer_buff);
+    USBD_LL_DataOutStage((USBD_HandleTypeDef *)hpcd->pData, epnum,
+                         hpcd->OUT_ep[epnum].xfer_buff);
 }
 
 // DataIn is from DEVICE to HOST
 void MyPCD_DataInStageCallback(PCD_HandleTypeDef *hpcd, uint8_t epnum)
 {
-    if (epnum == 0x01) {
-        TCFlag = 1;
+    USBD_LL_DataInStage((USBD_HandleTypeDef *)hpcd->pData, epnum,
+                        hpcd->IN_ep[epnum].xfer_buff);
+
+    if (epnum == 0x01)
+    {
+        txLen  = 0;   // ← clear here, AFTER hardware is done with the buffer
+        txBusy = 0;
+        TxStart();    // send next chunk if queued in the meantime
     }
-    USBD_LL_DataInStage((USBD_HandleTypeDef*)hpcd->pData, epnum, hpcd->IN_ep[epnum].xfer_buff);
 }
 
 // Debug some USB options
@@ -563,6 +669,18 @@ void debugStruc()
     cdcprintf("hpcd_USB_OTG_FS.Init.vbus_sensing_enable:%d\r\n", usb->vbus_sensing_enable);
     cdcprintf("hpcd_USB_OTG_FS.Init.use_dedicated_ep1:%d\r\n", usb->use_dedicated_ep1);
     cdcprintf("hpcd_USB_OTG_FS.Init.use_external_vbus:%d\r\n", usb->use_external_vbus);
+}
+
+void ProcessLine(uint8_t *buf, uint16_t len)
+{
+    uint8_t resp[128];
+    uint16_t pos = 0;
+
+    memcpy(&resp[pos], "Got: ", 5);  pos += 5;
+    memcpy(&resp[pos], buf, len);    pos += len;
+    memcpy(&resp[pos], "\r\n", 2);   pos += 2;
+
+    CDC_Transmit_FS(resp, pos);
 }
 
 /* USER CODE END 0 */
@@ -638,9 +756,63 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-    // SANDBOX
+    /* Drain RX buffer */
+    while (CDC_RxAvailable())
+    {
+        uint8_t b = CDC_RxRead();
+        KeyCode key = ParseKey(b);
+        switch (key)
+        {
+        case KEY_UP:
+            /* handle up    */
+            printf("KEY_UP pressed.\r\n");
+            break;
+        case KEY_DOWN:
+            /* handle down  */
+            printf("KEY_DOWN pressed.\r\n");
+            break;
+        case KEY_LEFT:
+            /* handle left  */
+            printf("KEY_LEFT pressed.\r\n");
+            break;
+        case KEY_RIGHT:
+            /* handle right */
+            printf("KEY_RIGHT pressed.\r\n");
+            break;
+        case KEY_ENTER:
+            /* handle enter */
+            if (lineLen > 0)
+            {
+                lineBuf[lineLen] = '\0';  /* null terminate for sscanf */
+                ProcessLine(lineBuf, lineLen);
+                lineLen = 0;
+            }
+            break;
+        case KEY_BACKSPACE:
+            if (lineLen > 0)
+            {
+                lineLen--;
+                printf("\b \b");  /* erase char on terminal */
+            }
+            break;
+        case KEY_NONE:
+            /* KEY_SEQUENCE is ignored, only true printable bytes reach here */
+            if (b >= 0x20 && b < 0x7F && lineLen < sizeof(lineBuf) - 1)
+            {
+                lineBuf[lineLen++] = b;
+                CDC_Transmit_FS(&b, 1);
+            }
+            break;
 
-    morse("C");
+        default: break;
+        }
+    }
+    TxStart(); // keep retrying until it goes through
+
+    // morse("C");
+    // if (CDC_RxAvailable()) {
+    //     cdcprintf("neshto doide po zhicata....\r\n");
+    // }
     // debugStruc();
     // dumpVars();
     // HAL_Delay(500);

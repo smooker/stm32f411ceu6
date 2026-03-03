@@ -276,6 +276,15 @@ static int8_t CDC_Receive_FS(uint8_t *Buf, uint32_t *Len)
 {
   /* USER CODE BEGIN 6 */
 
+    // UNUSED(Len);
+    if (*Len == 0)
+    {
+        /* ZLP — just re-arm and return */
+        USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
+        USBD_CDC_ReceivePacket(&hUsbDeviceFS);
+        return (USBD_OK);
+    }
+
   MyCDC_Receive_FS(Buf, Len);
 
   USBD_CDC_SetRxBuffer(&hUsbDeviceFS, &Buf[0]);
