@@ -35,6 +35,17 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
+typedef struct
+{
+  float mmpsmax;          // velocity maximum
+  float mmpsmin;          // velocity minimum
+  float dvdtacc;          // acceleration
+  float dvdtdecc;         // decceleration
+  float jogmm;            // jog units
+  float stepmm;           // step units
+  uint32_t spmm;          // steps per mm (conversational unit)
+} params_t;
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -68,6 +79,10 @@ extern uint8_t CDC_IsConnected;
 
 // Locals
 uint8_t TCFlag = 0;        //Transfer Complete Flag for usb cdcprintf
+params_t params;
+
+//
+uint32_t semaphore = 0;    // state machine flags
 
 // morse code letters and digits
 // __attribute__((section(".rodata"))) const char* morseCode[] = {
@@ -128,6 +143,50 @@ void volatile_memset(volatile void *s, int c, size_t n) {
     while (n-- > 0) {
         *p++ = (unsigned char)c;
     }
+}
+
+// parameters init - for debug purposes only
+void initParams()
+{
+  params.mmpsmax  = 1.0012f;
+  params.mmpsmin  = 1.0023f;
+  params.dvdtacc  = 1.0034f;
+  params.dvdtdecc = 1.0045f;
+  params.jogmm    = 1.0056f;
+  params.stepmm   = 1.0067f;
+  params.spmm     = 4096;
+}
+
+void dumpVars()
+{
+    // readVariables();
+    // cdcprintf("----------%08d-----\r\n", debugonly++);
+    cdcprintf("Dump of NVARS in EEPROM\r\n");
+    cdcprintf("-----------------------\r\n");
+    cdcprintf("mmpsmax........: %7.3f\r\n", params.mmpsmax );
+    cdcprintf("mmpsmin........: %7.3f\r\n", params.mmpsmin );
+    cdcprintf("dvdtacc........: %7.3f\r\n", params.dvdtacc );
+    cdcprintf("dvdtdecc.......: %7.3f\r\n", params.dvdtdecc );
+    cdcprintf("jogmm..........: %7.3f\r\n", params.jogmm );
+    cdcprintf("stepmm.........: %7.3f\r\n", params.stepmm );
+    cdcprintf("spmm...........: %7d\r\n",  params.spmm );
+    cdcprintf("-----------------------\r\n");
+    cdcprintf("semaphore....:  %d\r\n", semaphore);
+    cdcprintf("SEM_EL.......:  %d\r\n", SEM_EL);
+    cdcprintf("SEM_ER.......:  %d\r\n", SEM_ER);
+    cdcprintf("SEM_JOGL.....:  %d\r\n", SEM_JOGL);
+    cdcprintf("SEM_JOGR.....:  %d\r\n", SEM_JOGR);
+    cdcprintf("SEM_JOGSTEPL.:  %d\r\n", SEM_JOGSTEPL);
+    cdcprintf("SEM_JOGSTEPR.:  %d\r\n", SEM_JOGSTEPR);
+    cdcprintf("-----------------------\r\n");
+    cdcprintf("DB_JOGL......:  %d\r\n", DB_JOGL);
+    cdcprintf("DB_JOGR......:  %d\r\n", DB_JOGR);
+    cdcprintf("DB_STEPL.....:  %d\r\n", DB_STEPL);
+    cdcprintf("DB_STEPR.....:  %d\r\n", DB_STEPR);
+    cdcprintf("DB_EL........:  %d\r\n", DB_EL);
+    cdcprintf("DB_ER........:  %d\r\n", DB_ER);
+    cdcprintf("DB_EE........:  %d\r\n", DB_EE);
+    cdcprintf("-----------------------\r\n");
 }
 
 // morse dot function
@@ -358,6 +417,8 @@ void debugStruc()
 {
     USB_CfgTypeDef *usb = &hpcd_USB_OTG_FS.Init;
     cdcprintf("#########################################\r\n");
+    cdcprintf("sizeof float is %d bytes\r\n", sizeof(float));
+    cdcprintf("-----------------------------------------\r\n");
     cdcprintf("hpcd_USB_OTG_FS.Init.dev_endpoints:%d\r\n", usb->dev_endpoints);
     cdcprintf("hpcd_USB_OTG_FS.Init.Host_channels:%d\r\n", usb->Host_channels);
     cdcprintf("hpcd_USB_OTG_FS.Init.dma_enable:%d\r\n", usb->dma_enable);
@@ -428,6 +489,11 @@ int main(void)
       BKPT;
   }
 
+  initParams();
+
+  // USB enumeration
+  HAL_Delay(1200);
+
   uint16_t asdf = 0x55aa;
 
   if ( (asdf = EEPROM_Write(0x0001, 0x55aa50a0)) != 0x00 ) {
@@ -443,7 +509,8 @@ int main(void)
     // SANDBOX
 
     morse("C");
-    debugStruc();
+    // debugStruc();
+    dumpVars();
     // HAL_Delay(500);
   }
   /* USER CODE END 3 */
