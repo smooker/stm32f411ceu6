@@ -95,6 +95,7 @@ typedef enum {
     KEY_ESC,
     KEY_ENTER,
     KEY_BACKSPACE,
+    KEY_CLEAR,
 } KeyCode;
 
 typedef enum {
@@ -220,6 +221,9 @@ KeyCode ParseKey(uint8_t byte)
         if      (byte == 0x1B) { state = SEQ_ESC;      return KEY_SEQUENCE; }
         else if (byte == '\r' || byte == '\n')         return KEY_ENTER;
         else if (byte == 0x7F || byte == 0x08)         return KEY_BACKSPACE;
+        else if (byte == 0x0C) {
+            return KEY_CLEAR;  // Ctrl+L
+        }
         break;
 
     case SEQ_ESC:
@@ -407,6 +411,18 @@ void dash()
 int _write(int file, char *ptr, int len)
 {
     UNUSED(file);
+
+    USBD_CDC_HandleTypeDef *hcdc =
+        (USBD_CDC_HandleTypeDef *)hUsbDeviceFS.pClassData;
+
+    /* wait until TX is free */
+    uint32_t timeout = HAL_GetTick();
+    while (hcdc->TxState != 0)
+    {
+        if (HAL_GetTick() - timeout > 100)  /* 100ms timeout — avoid infinite hang */
+            return 0;
+    }
+
     CDC_Transmit_FS((uint8_t *)ptr, len);
     return len;
 }
@@ -676,7 +692,7 @@ void ProcessLine(uint8_t *buf, uint16_t len)
     uint8_t resp[128];
     uint16_t pos = 0;
 
-    memcpy(&resp[pos], "Got: ", 5);  pos += 5;
+    memcpy(&resp[pos], " Got: ", 5);  pos += 5;
     memcpy(&resp[pos], buf, len);    pos += len;
     memcpy(&resp[pos], "\r\n", 2);   pos += 2;
 
@@ -720,6 +736,8 @@ int main(void)
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
+  setvbuf(stdout, NULL, _IONBF, 0);  /* disable buffering entirely */
+
   HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_CONNECT_CB_ID,  My_PCD_ConnectCallback);
   HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_DISCONNECT_CB_ID,  My_PCD_DisconnectCallback);
   HAL_PCD_RegisterCallback(&hpcd_USB_OTG_FS, HAL_PCD_SOF_CB_ID,  My_PCD_SOF);
@@ -760,7 +778,9 @@ int main(void)
     while (CDC_RxAvailable())
     {
         uint8_t b = CDC_RxRead();
+
         KeyCode key = ParseKey(b);
+
         switch (key)
         {
         case KEY_UP:
@@ -792,22 +812,25 @@ int main(void)
             if (lineLen > 0)
             {
                 lineLen--;
-                printf("\b \b");  /* erase char on terminal */
+                printf("\b \b");
             }
+            break;
+        case KEY_CLEAR:
+            printf("\033[2J\033[H> %.*s", lineLen, lineBuf);
             break;
         case KEY_NONE:
             /* KEY_SEQUENCE is ignored, only true printable bytes reach here */
             if (b >= 0x20 && b < 0x7F && lineLen < sizeof(lineBuf) - 1)
             {
                 lineBuf[lineLen++] = b;
-                CDC_Transmit_FS(&b, 1);
+                printf("%c", b);
             }
             break;
 
         default: break;
         }
     }
-    TxStart(); // keep retrying until it goes through
+    // TxStart(); // keep retrying until it goes through
 
     // morse("C");
     // if (CDC_RxAvailable()) {
