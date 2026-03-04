@@ -8,6 +8,16 @@
 /* replace roundf */
 #define ROUND(x)    ((int32_t)((x) >= 0.0f ? (x) + 0.5f : (x) - 0.5f))
 
+/* integer square root approximation — no libm needed */
+#define SQRTF(x)  sqrtf_approx(x)
+
+static float sqrtf_approx(float x)
+{
+    float result;
+    __asm volatile ("vsqrt.f32 %0, %1" : "=w"(result) : "w"(x));
+    return result;
+}
+
 /* ---- extern motorParams from main.c ------------------------------------ */
 extern params_t motorParams;
 
@@ -93,7 +103,7 @@ void Stepper_SaveParams(void)
 
 void Stepper_DumpParams(void)
 {
-    printf("-------------------------------\r\n");
+    printf("\r\n-------------------------------\r\n");
     printf("mmpsmax........: %7.3f mm/s\r\n",   motorParams.mmpsmax.f);
     printf("mmpsmin........: %7.3f mm/s\r\n",   motorParams.mmpsmin.f);
     printf("dvdtacc........: %7.3f mm/s2\r\n",  motorParams.dvdtacc.f);
@@ -136,7 +146,7 @@ void Stepper_Init(TIM_HandleTypeDef *htim)
     /* fixed pulse width */
     __HAL_TIM_SET_COMPARE(stepTim, TIM_CHANNEL_3, PULSE_TICKS);
 
-    printf("stepper init ok\r\n");
+    printf("\r\nstepper init ok\r\n");
     Stepper_DumpParams();
 }
 
@@ -167,8 +177,27 @@ static void StartMove(int32_t steps)
     currentPeriod  = maxPeriod;
 
     decelSteps = CalcDecelSteps(minPeriod, maxPeriod, motorParams.dvdtdecc.f);
-    if (decelSteps > stepsRemaining / 2)
-        decelSteps = stepsRemaining / 2;
+
+    /* calculate peak speed achievable in available steps */
+    float accel_sps2 = motorParams.dvdtacc.f  * (float)motorParams.spmm.u;
+    float decel_sps2 = motorParams.dvdtdecc.f * (float)motorParams.spmm.u;
+    float v_max_sps  = (float)STEPPER_TIM_CLOCK / (float)minPeriod;
+    float v_min_sps  = (float)STEPPER_TIM_CLOCK / (float)maxPeriod;
+
+    /* peak speed for triangle profile */
+    float v_peak_sps = SQRTF(2.0f * accel_sps2 * decel_sps2 * (float)stepsRemaining
+                             / (accel_sps2 + decel_sps2));
+
+    /* clamp to mmpsmax */
+    if (v_peak_sps > v_max_sps) v_peak_sps = v_max_sps;
+
+    /* recalculate minPeriod and decelSteps from actual peak speed */
+    if (v_peak_sps > v_min_sps)
+    {
+        minPeriod  = (uint32_t)((float)STEPPER_TIM_CLOCK / v_peak_sps);
+        decelSteps = (int32_t)((v_peak_sps * v_peak_sps - v_min_sps * v_min_sps)
+                                / (2.0f * decel_sps2));
+    }
 
     stepperState = STEPPER_ACCEL;
 

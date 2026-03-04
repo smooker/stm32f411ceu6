@@ -677,7 +677,7 @@ void ProcessLine(void)
                       "  set spmm     <n>   steps per mm\r\n"
                       "  params, save, dump, stop, cls, uptime, reset\r\n");
         else
-            printf("unknown: %s\r\n", cmd);
+            printf(" unknown: %s\r\n", cmd);
     }
 }
 
@@ -775,15 +775,23 @@ int main(void)
       BKPT;
   }
 
-  Stepper_Init(&htim2);
-
   // USB enumeration
   HAL_Delay(1200);
+
+  /* clear RX ring buffer and line buffer */
+  rxHead  = 0;
+  rxTail  = 0;
+  lineLen = 0;
+  lineBuf[0] = '\0';
+
+  Stepper_LoadParams();   /* load from EEPROM first */
+  printf("spmm after load: %lu\r\n", motorParams.spmm.u);
+  Stepper_Init(&htim2);  /* then init — DumpParams will show correct values */
 
   // initParams();
   // writeParams();
   // BKPT;
-  readParams();
+  // readParams();
   // BKPT;
 
   while (1)
