@@ -2428,4 +2428,5 @@ end
 set auto-load safe-path .
 
 set max-value-size unlimited
-
+source /home/smooker/src/stm32/PyCortexMDebug/scripts/gdb.py
+svd_load ./STM32F411.svd

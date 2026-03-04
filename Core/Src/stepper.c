@@ -155,13 +155,13 @@ static void StartMove(int32_t steps)
     HAL_GPIO_WritePin(DIR_GPIO_Port, DIR_Pin,
                       steps > 0 ? GPIO_PIN_SET : GPIO_PIN_RESET);
 
-    /* wait for DIR to settle BEFORE starting timer — no pulse generated */
-    /* 50us at 96MHz = 4800 NOPs roughly, use DWT or simple loop         */
+    /* wait for DIR to settle */
     uint32_t t = HAL_GetTick();
-    while (HAL_GetTick() == t);  /* wait at least 1ms — more than enough */
+    while (HAL_GetTick() == t);
 
-    stepsRemaining = ABS(steps);  /* use (steps < 0) ? -steps : steps    */
+    stepsRemaining = ABS(steps);
     stepCount      = 0;
+    decelCount     = 0;
     minPeriod      = MmpsToTicks(motorParams.mmpsmax.f);
     maxPeriod      = MmpsToTicks(motorParams.mmpsmin.f);
     currentPeriod  = maxPeriod;
@@ -170,18 +170,25 @@ static void StartMove(int32_t steps)
     if (decelSteps > stepsRemaining / 2)
         decelSteps = stepsRemaining / 2;
 
-    stepperState = STEPPER_ACCEL;  /* go straight to ACCEL — no DIRSETUP state needed */
+    stepperState = STEPPER_ACCEL;
 
+    /* 1. reconfigure channel to PWM Mode 1 */
+    TIM_OC_InitTypeDef sConfig = {0};
+    sConfig.OCMode     = TIM_OCMODE_PWM1;
+    sConfig.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfig.OCFastMode = TIM_OCFAST_DISABLE;
+    sConfig.Pulse      = PULSE_TICKS;
+    HAL_TIM_PWM_ConfigChannel(stepTim, &sConfig, TIM_CHANNEL_3);
+
+    /* 2. set period and counter */
     __HAL_TIM_SET_AUTORELOAD(stepTim, currentPeriod - 1);
     __HAL_TIM_SET_COMPARE(stepTim, TIM_CHANNEL_3, PULSE_TICKS);
     __HAL_TIM_SET_COUNTER(stepTim, 0);
+
+    /* 3. start */
     HAL_TIM_PWM_Start_IT(stepTim, TIM_CHANNEL_3);
 
-    printf("move %ld steps\r\n", (int32_t)(steps < 0 ? -steps : steps));
-
-    printf("minPeriod: %lu maxPeriod: %lu\r\n", minPeriod, maxPeriod);
-    printf("decelSteps: %ld stepsRemaining: %ld\r\n", decelSteps, stepsRemaining);
-    printf("accelSteps needed: ~%ld\r\n", decelSteps); // same as decel for equal accel/decel
+    printf("move %ld steps\r\n", (long)ABS(steps));
 }
 
 void Stepper_Move(float mm)
@@ -259,10 +266,15 @@ void Stepper_ISR(void)
 
     if (stepsRemaining == 0)
     {
-        /* wait for current pulse to finish (counter > CCR) */
-        while (__HAL_TIM_GET_COUNTER(stepTim) < __HAL_TIM_GET_COMPARE(stepTim, TIM_CHANNEL_3));
+        uint32_t ccr = __HAL_TIM_GET_COMPARE(stepTim, TIM_CHANNEL_3);
+        while (__HAL_TIM_GET_COUNTER(stepTim) <= ccr + 10);
+
+        /* set idle state LOW before disabling channel */
+        stepTim->Instance->CR2 &= ~TIM_CR2_OIS3;  /* OIS3 = output idle state CH3 = 0 = LOW */
+
         HAL_TIM_PWM_Stop_IT(stepTim, TIM_CHANNEL_3);
         stepperState = STEPPER_IDLE;
+        BKPT;
         return;
     }
 
