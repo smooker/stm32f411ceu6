@@ -19,7 +19,6 @@
 
 /* ---- Timer clock --------------------------------------------------- */
 #define STEPPER_TIM_CLOCK   96000000UL          /* 96MHz                */
-// #define PULSE_TICKS         ((STEPPER_TIM_CLOCK / 1000000UL) * pulsedur)  /* 50us = 4800 ticks */
 #define DIRSETUP_TICKS      ((STEPPER_TIM_CLOCK / 1000000UL) * delayafterdir)
 
 #define ABS(x)  ((x) < 0 ? -(x) : (x))

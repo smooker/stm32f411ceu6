@@ -274,7 +274,6 @@ void Stepper_ISR(void)
 
         HAL_TIM_PWM_Stop_IT(stepTim, TIM_CHANNEL_3);
         stepperState = STEPPER_IDLE;
-        BKPT;
         return;
     }
 
@@ -316,5 +315,5 @@ void Stepper_ISR(void)
     }
 
     __HAL_TIM_SET_AUTORELOAD(stepTim, currentPeriod - 1);
-    __HAL_TIM_SET_COMPARE(stepTim, TIM_CHANNEL_1, PULSE_TICKS);
+    __HAL_TIM_SET_COMPARE(stepTim, TIM_CHANNEL_3, PULSE_TICKS);
 }
